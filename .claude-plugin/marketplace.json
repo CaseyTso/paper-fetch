@@ -1,5 +1,6 @@
 {
   "name": "paper-fetch",
+  "description": "Agent-first single-paper PDF acquisition for Claude Code and Zotero.",
   "owner": {
     "name": "CaseyTso"
   },
