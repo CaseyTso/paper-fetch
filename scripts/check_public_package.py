@@ -27,6 +27,7 @@ CONTROLLED_GLOBS = (
     "references/**/*.md",
     "scripts/**/*.py",
     ".github/**/*",
+    ".claude-plugin/**",
 )
 
 _LEGACY_DIR = "scansci" + "-lite"

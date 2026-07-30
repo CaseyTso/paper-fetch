@@ -116,6 +116,51 @@ HERMES_HOME="$HOME/.hermes/profiles/<profile>" \
 
 请勿误修改其他用户或其他 Profile 的 Skill 目录。
 
+## 安装到 Claude Code
+
+同一仓库根目录也是 Claude Code 插件：根目录 `SKILL.md` 与 `references/`，清单在 [`.claude-plugin/`](.claude-plugin/)。Skill 仍依赖 `paper-fetch` CLI 与 `~/.paper-fetch/config.json`（见上文）。Hermes 与 Claude Code 可共用同一份 clone。
+
+### 推荐：从 GitHub 添加 marketplace
+
+```bash
+claude plugin marketplace add CaseyTso/paper-fetch
+claude plugin install paper-fetch@paper-fetch
+```
+
+执行 `/reload-plugins` 或新开 Claude Code 会话。用 `/paper-fetch` 调用（Claude Code 2.1.81 实测），或用自然语言要求下载论文 PDF 到 Zotero。
+
+`plugin.json` 含 `"skills": ["./"]`，以便当前 Claude Code 发现根目录 `SKILL.md`；2.1.142+ 也可在无该字段时自动暴露根级 `SKILL.md`。
+
+验证：
+
+```bash
+claude plugin list
+```
+
+应看到已启用的 `paper-fetch@paper-fetch`。
+
+### 开发：本地 marketplace 或符号链接
+
+本地 clone（路径自定；示例用 `$HOME/paper-fetch`）：
+
+```bash
+claude plugin marketplace add "$HOME/paper-fetch"
+claude plugin install paper-fetch@paper-fetch -s user
+```
+
+或不走 marketplace，直接链到个人 skill 目录：
+
+```bash
+mkdir -p "$HOME/.claude/skills"
+ln -sfn "$HOME/paper-fetch" "$HOME/.claude/skills/paper-fetch"
+```
+
+无论哪种方式都需要 CLI：
+
+```bash
+uv tool install "git+https://github.com/CaseyTso/paper-fetch.git"
+```
+
 ## 命名说明
 
 | 层级 | 名称 | 说明 |

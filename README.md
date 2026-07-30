@@ -114,6 +114,51 @@ HERMES_HOME="$HOME/.hermes/profiles/<profile>" \
 
 Do not modify another user's or profile's Skill directory unintentionally.
 
+## Install into Claude Code
+
+The same repository root is a Claude Code plugin: root `SKILL.md` plus `references/`, with manifests under [`.claude-plugin/`](.claude-plugin/). The Skill still depends on the `paper-fetch` CLI and `~/.paper-fetch/config.json` (see above). Hermes and Claude Code can share one clone.
+
+### Recommended: marketplace from GitHub
+
+```bash
+claude plugin marketplace add CaseyTso/paper-fetch
+claude plugin install paper-fetch@paper-fetch
+```
+
+Reload plugins (`/reload-plugins`) or start a new Claude Code session. Invoke the skill with `/paper-fetch` (measured on Claude Code 2.1.81), or ask in natural language to download a paper PDF to Zotero.
+
+`plugin.json` sets `"skills": ["./"]` so the root `SKILL.md` is discovered on current Claude Code releases; Claude Code 2.1.142+ also auto-surfaces a root-level `SKILL.md` without that field.
+
+Verify:
+
+```bash
+claude plugin list
+```
+
+You should see `paper-fetch@paper-fetch` enabled.
+
+### Development: local marketplace or symlink
+
+From a local clone (path is yours; examples use `$HOME/paper-fetch`):
+
+```bash
+claude plugin marketplace add "$HOME/paper-fetch"
+claude plugin install paper-fetch@paper-fetch -s user
+```
+
+Or link the clone as a personal skill without marketplace:
+
+```bash
+mkdir -p "$HOME/.claude/skills"
+ln -sfn "$HOME/paper-fetch" "$HOME/.claude/skills/paper-fetch"
+```
+
+CLI reminder (required either way):
+
+```bash
+uv tool install "git+https://github.com/CaseyTso/paper-fetch.git"
+```
+
 ## Naming
 
 | Layer | Name | Why |

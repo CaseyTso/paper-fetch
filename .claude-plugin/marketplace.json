@@ -1,0 +1,14 @@
+{
+  "name": "paper-fetch",
+  "owner": {
+    "name": "CaseyTso"
+  },
+  "plugins": [
+    {
+      "name": "paper-fetch",
+      "source": "./",
+      "description": "Download a single academic paper PDF through ordered sources and optionally attach it to Zotero.",
+      "version": "0.3.0"
+    }
+  ]
+}

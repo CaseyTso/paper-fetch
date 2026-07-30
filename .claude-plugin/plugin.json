@@ -1,0 +1,13 @@
+{
+  "name": "paper-fetch",
+  "version": "0.3.0",
+  "description": "Download a single academic paper PDF through ordered sources and optionally attach it to Zotero.",
+  "author": {
+    "name": "CaseyTso"
+  },
+  "homepage": "https://github.com/CaseyTso/paper-fetch",
+  "repository": "https://github.com/CaseyTso/paper-fetch",
+  "skills": [
+    "./"
+  ]
+}
