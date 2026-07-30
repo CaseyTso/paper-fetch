@@ -2,6 +2,8 @@
 
 Minimal single-paper PDF acquisition and Zotero attachment.
 
+[中文文档](README.zh-CN.md) · [English documentation](README.md)
+
 ## Naming
 
 | Layer | Name | Why |
