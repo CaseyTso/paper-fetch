@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pdf
+*.part
+.coverage
+htmlcov/
+.DS_Store
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Hermes-local planning and progress files; keep them out of public snapshots.
+.hermes/
+PROGRESS.md
+BLOCKED.md
+
+# Local-only artifacts
+test_downloads/
+*.bundle

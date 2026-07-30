@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "paper-fetch"
+version = "0.3.0"
+description = "Minimal single-paper PDF acquisition and Zotero attachment"
+requires-python = ">=3.11"
+dependencies = [
+  "requests[socks]>=2.32",
+  "pypdf>=5",
+  "browser-cookie3>=0.19",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+paper-fetch = "paper_fetch.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/paper_fetch"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: requires credentials, network, or browser interaction"]
+addopts = "-m \"not live\""
