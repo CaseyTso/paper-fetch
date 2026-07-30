@@ -1,46 +1,131 @@
 # paper-fetch
 
-Minimal single-paper PDF acquisition and Zotero attachment.
+Agent-first single-paper PDF acquisition Skill and CLI for Zotero.
 
 [中文文档](README.zh-CN.md) · [English documentation](README.md)
 
-## Naming
+`paper-fetch` is primarily designed to be invoked by an AI agent: give it one DOI, PMID, PMCID, exact title, complete citation, or Zotero item key, and let the agent parse the structured JSON result. It can also be used directly from a terminal.
 
-| Layer | Name | Why |
-|---|---|---|
-| Distribution / CLI / repo / config dir / env prefix | `paper-fetch` | public product name |
-| Python import package | `paper_fetch` | Python identifiers cannot contain hyphens |
-| Config file | `~/.paper-fetch/config.json` | personal runtime only; never committed |
-| Env vars | `PAPER_FETCH_*` | override JSON values |
+- GitHub: [CaseyTso/paper-fetch](https://github.com/CaseyTso/paper-fetch)
+- Hermes Skill source: [`SKILL.md`](SKILL.md)
+- Skill protocol references: [`references/`](references/)
 
-Do not mix legacy product names into this tree.
+## What it does
 
-## Install
+- Resolves a single paper identifier or exact title.
+- Tries configured acquisition sources in a fixed order.
+- Validates that the result is a real multi-page PDF.
+- Returns machine-readable JSON with source, path, attempts, status, and errors.
+- Optionally creates or updates a Zotero item and uploads the PDF attachment.
 
-Development (editable, from this repository):
+This is not a keyword-search engine or a batch literature-discovery tool. For multiple papers, an agent should call the single-paper command once per paper.
 
-```bash
-cd paper-fetch
-uv sync --extra dev
-uv run paper-fetch --help
-```
+## Install the CLI
 
-User-level CLI from GitHub:
+### User-level installation from GitHub
 
 ```bash
 uv tool install "git+https://github.com/CaseyTso/paper-fetch.git"
 paper-fetch --help
 ```
 
-Or editable from a local clone:
+### Development installation from a clone
+
+```bash
+git clone https://github.com/CaseyTso/paper-fetch.git
+cd paper-fetch
+uv sync --extra dev
+uv run paper-fetch --help
+```
+
+### Editable local installation
+
+Use this when developing the Skill and CLI. Changes under `src/` are used immediately by the CLI:
 
 ```bash
 uv tool install --editable --force .
+paper-fetch --help
 ```
+
+## Install into Hermes
+
+The repository root contains the complete Skill: `SKILL.md` plus its `references/` directory. Choose one of the following modes.
+
+### Recommended for Skill development: clone and symlink
+
+This keeps the repository as the only editable source. Hermes reads the same files that you edit and test:
+
+```bash
+mkdir -p "${HERMES_HOME:-$HOME/.hermes}/skills/research"
+git clone https://github.com/CaseyTso/paper-fetch.git "$HOME/paper-fetch"
+ln -sfn "$HOME/paper-fetch" "${HERMES_HOME:-$HOME/.hermes}/skills/research/paper-fetch"
+hermes skills list | grep paper-fetch
+```
+
+If the repository already exists, update it instead:
+
+```bash
+cd "$HOME/paper-fetch"
+git pull --ff-only origin main
+```
+
+Verify the link:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import os
+repo = Path.home() / "paper-fetch"
+installed = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / "skills/research/paper-fetch"
+print("target:", installed.resolve())
+print("matches repository:", installed.resolve() == repo.resolve())
+PY
+```
+
+For a private development checkout, replace `$HOME/paper-fetch` with your local clone path. Do not copy a personalized `SKILL.md` into the public repository; keep personal configuration outside Git.
+
+### Standard Hermes installation from the public Skill file
+
+Hermes can install a Skill from a direct `SKILL.md` URL:
+
+```bash
+hermes skills install \
+  "https://raw.githubusercontent.com/CaseyTso/paper-fetch/main/SKILL.md" \
+  --category research \
+  --name paper-fetch \
+  --yes
+```
+
+Use this for a standalone Skill installation. For development, use the clone-and-symlink method above so the Skill and its references remain tied to the repository. After installation, verify it with:
+
+```bash
+hermes skills list | grep paper-fetch
+hermes skills inspect paper-fetch
+```
+
+### Hermes profiles
+
+The active profile determines the Skill directory. For another profile, set `HERMES_HOME` to that profile's home before linking or installing:
+
+```bash
+HERMES_HOME="$HOME/.hermes/profiles/<profile>" \
+  hermes skills list
+```
+
+Do not modify another user's or profile's Skill directory unintentionally.
+
+## Naming
+
+| Layer | Name | Why |
+|---|---|---|
+| Distribution, CLI, repository, config directory, environment prefix | `paper-fetch` | Public product name |
+| Python import package | `paper_fetch` | Python identifiers cannot contain hyphens |
+| Personal config | `~/.paper-fetch/config.json` | Runtime-only configuration; never committed |
+| Environment variables | `PAPER_FETCH_*` | Override JSON values |
 
 ## Configure
 
-Create `~/.paper-fetch/config.json` (recommended permissions `0600`):
+Create `~/.paper-fetch/config.json` and protect it with mode `0600`:
 
 ```json
 {
@@ -57,58 +142,79 @@ Create `~/.paper-fetch/config.json` (recommended permissions `0600`):
 }
 ```
 
-All fields are optional. Fill in your own credentials; this repository never ships personal values.
-Environment variables (`PAPER_FETCH_*`, e.g. `PAPER_FETCH_ZOTERO_API_KEY`) override JSON values.
+All fields are optional. Fill in your own credentials and institutional settings. Environment variables such as `PAPER_FETCH_ZOTERO_API_KEY` override JSON values. Never commit API keys, cookies, local paths, or downloaded PDFs.
 
-## Institution access (EasyConnect/aTrust)
+## Agent usage
 
-- `institution_socks5` accepts a SOCKS5 proxy URL or an HTTP proxy URL exposed by aTrust.
-- `institution_tls_verify` defaults to `true`. Set it to `false` only for aTrust's local MITM proxy when its local CA is not trusted by Python; this disables certificate verification for institution requests only.
-
-## Usage
+Agents should invoke the CLI once per paper and always request JSON:
 
 ```bash
-# By DOI
-paper-fetch fetch '10.1371/journal.pmed.0020124' --json
+paper-fetch fetch '<identifier>' --json
+```
 
-# By PMID
-paper-fetch fetch '16060722' --json
+Accepted identifiers include DOI, PMID, PMCID, exact title, complete citation, and `zotero:<ITEM_KEY>`.
 
-# By PMCID
-paper-fetch fetch 'PMC1182327' --json
+Important JSON fields:
 
-# By exact title
-paper-fetch fetch 'Why most published research findings are false' --json
+| Field | Meaning |
+|---|---|
+| `success` | A valid multi-page PDF was acquired |
+| `source` | Source that produced the PDF |
+| `pdf_path` | Absolute path to the PDF |
+| `zotero_item_key` | Parent Zotero item when attachment succeeded |
+| `attempts` | Ordered source attempts, statuses, and timings |
+| `error` | Human-readable failure summary |
 
-# By Zotero item key
-paper-fetch fetch 'zotero:ABCD1234' --json
+Useful flags:
 
-# Skip Zotero; write only to a local directory
-paper-fetch fetch '10.1371/journal.pmed.0020124' --json --no-zotero --output /tmp/paper-fetch-out
+- `--output <directory>`: override the output directory.
+- `--no-zotero`: save locally without changing Zotero.
+- `--force`: acquire again even when cached or already attached.
+
+Example:
+
+```bash
+paper-fetch fetch \
+  '10.1371/journal.pmed.0020124' \
+  --json \
+  --no-zotero \
+  --output /tmp/paper-fetch-out
 ```
 
 ## Source order
 
-1. **Open Access** — PMC → Europe PMC → PubMed linkout → Unpaywall
-2. **Institution** — EasyConnect/aTrust SOCKS5 or HTTP proxy
+The pipeline stops at the first valid multi-page PDF:
+
+1. **Open access** — PMC → Europe PMC → PubMed full-text links → Unpaywall
+2. **Institution access** — EasyConnect/aTrust SOCKS5 or HTTP proxy
 3. **Sci-Hub** — Clash HTTP proxy
-4. **ableSci** — 科研通 (Chrome cookies HTTP API, OpenCLI Browser Bridge fallback)
+4. **ableSci/科研通** — Chrome-cookie HTTP API, then OpenCLI Browser Bridge fallback
 
-Stops at the first valid multi-page PDF.
+The ableSci request may be asynchronous. `pending` or `poll_timeout` means the request is still processing, not that the paper is missing. Authentication and CAPTCHA statuses require the user to complete the browser step and rerun the command.
 
-## Hermes Skill
+## Zotero integration
 
-This repository includes `SKILL.md` and `references/`. For Hermes, link the skill install path to the repository root (or the skill directory Hermes expects) so the skill and CLI share one editable source.
+By default, a successful fetch is attached to Zotero:
+
+1. Match an existing item by DOI and attach the PDF, or create a journal-article item.
+2. Upload the PDF through Zotero's official file-upload protocol.
+3. Mirror the attachment into the local Zotero storage directory.
+
+Use `--no-zotero` for a non-mutating local download.
 
 ## Tests
 
 ```bash
-uv run pytest          # all non-live tests
-uv run pytest -m live  # live integration tests (requires credentials)
+uv run pytest          # non-live tests
+uv run pytest -m live  # network/credential/browser-backed tests
 ```
 
-## License & notice
+The default test command excludes live tests. The public-package checker also validates Skill references, naming, CLI metadata, and public-tree safety:
 
-This tool downloads papers through multiple sources. Respect publisher terms,
-institutional access policies, and applicable copyright law. Configure only
-sources you are authorised to use.
+```bash
+python scripts/check_public_package.py
+```
+
+## Legal and access notice
+
+Use only sources and institutional access for which you are authorized. Respect publisher terms, institutional policies, applicable copyright law, and the terms of any external service.
