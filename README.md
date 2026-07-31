@@ -187,7 +187,102 @@ Create `~/.paper-fetch/config.json` and protect it with mode `0600`:
 }
 ```
 
-All fields are optional. Fill in your own credentials and institutional settings. Environment variables such as `PAPER_FETCH_ZOTERO_API_KEY` override JSON values. Never commit API keys, cookies, local paths, or downloaded PDFs.
+All fields are optional. With only `output_dir` and `unpaywall_email` set,
+open-access downloads work; **each optional source stays disabled until its
+fields are configured**:
+
+| Source | Fields that enable it | While disabled |
+|---|---|---|
+| Institution | `institution_socks5` | route skipped |
+| Sci-Hub | `clash_proxy` | route skipped |
+| ableSci | `ablesci_url` + Chrome login | route skipped |
+| Zotero | `zotero_library_id`, `zotero_library_type`, `zotero_inbox_collection_key`, `zotero_api_key` | PDF saved locally only (as with `--no-zotero`) |
+
+Environment variables such as `PAPER_FETCH_ZOTERO_API_KEY` override JSON
+values. Never commit API keys, cookies, local paths, or downloaded PDFs.
+
+### First-run check: `paper-fetch doctor`
+
+After installing the CLI, run the read-only health check:
+
+```bash
+paper-fetch doctor --json
+```
+
+It verifies, without writing anything: the config file (exists, parses,
+permissions), the institution proxy (configured, URL valid, port reachable —
+and it notices a running EasyConnect/aTrust client even when not configured),
+the Clash proxy (same checks), the ableSci session (URL set, Chrome cookies
+readable, OpenCLI fallback available), and the Zotero fields.
+
+- JSON `overall` is `ok` when everything is ready, `needs_configuration` when
+  optional checks are missing (exit code 0 — open-access downloads still
+  work), and `error` when the config file is unreadable (exit code 5).
+- Every check includes an `action` — the next step for a human or an agent.
+- The report never prints credentials, cookie values, or API keys.
+
+### Institution access (EasyConnect / aTrust)
+
+1. **Log in to your institution VPN client first** (EasyConnect or aTrust)
+   and stay connected.
+2. **Find the local proxy port**:
+
+   ```bash
+   lsof -nP -iTCP -sTCP:LISTEN
+   ```
+
+   Look for the listener owned by the VPN client.
+3. **Determine HTTP or SOCKS5.** aTrust often exposes an HTTP proxy even
+   though the field is named `institution_socks5`. Probe a candidate port:
+   if `curl -x http://127.0.0.1:<PORT> -sS -o /dev/null -w '%{http_code}\n' https://api.crossref.org`
+   returns 200, configure `http://...`; otherwise use `socks5h://...`.
+4. **Configure**:
+
+   ```json
+   {
+     "institution_socks5": "http://127.0.0.1:<PORT>",
+     "institution_tls_verify": true
+   }
+   ```
+
+   `institution_tls_verify` defaults to `true`; set it to `false` only when
+   the VPN client uses a local MITM certificate that Python does not trust.
+   The setting applies only to institution requests. The port may change
+   after a VPN restart — rerun `paper-fetch doctor` to confirm.
+5. Verify with `paper-fetch doctor --json` (the `institution` row should be
+   `ok`).
+
+Full probe procedure and troubleshooting:
+[`references/institution-access.md`](references/institution-access.md).
+
+### Sci-Hub via Clash
+
+1. Start Clash and connect a node.
+2. Read the HTTP or Mixed port from your client's settings (ClashX commonly
+   7890) — do not guess it.
+3. Verify:
+   `curl -x http://127.0.0.1:<PORT> -sS -o /dev/null -w '%{http_code}\n' https://api.ip.sb/ip`
+   should return 200.
+4. Configure `"clash_proxy": "http://127.0.0.1:<PORT>"` in the config file
+   and confirm with `paper-fetch doctor --json`.
+5. If a fetch returns `challenge_required`, open the reported Sci-Hub URL in
+   your browser, complete the CAPTCHA, and rerun the command.
+
+Setup guide: [`references/scihub-clash-setup.md`](references/scihub-clash-setup.md).
+
+### ableSci / 科研通
+
+1. Open <https://www.ablesci.com> in Chrome and **log in once**. paper-fetch
+   reads the session from Chrome's cookies; it never stores or asks for your
+   ableSci password.
+2. Configure `"ablesci_url": "https://www.ablesci.com"`.
+3. If cookies cannot be read (Chrome cookie DB locked, Keychain locked), the
+   CLI falls back to the OpenCLI Browser Bridge when `opencli` is installed.
+   `paper-fetch doctor --json` reports which path is available.
+4. If a fetch returns `authentication_required`, log in to ableSci in Chrome
+   again and rerun the same command.
+
+User guide: [`references/ablesci-login.md`](references/ablesci-login.md).
 
 ## Agent usage
 
@@ -215,6 +310,10 @@ Useful flags:
 - `--output <directory>`: override the output directory.
 - `--no-zotero`: save locally without changing Zotero.
 - `--force`: acquire again even when cached or already attached.
+
+Before the first fetch — or whenever a source behaves unexpectedly — run
+`paper-fetch doctor --json` and act on the reported checks (see
+[Configure](#configure)).
 
 Example:
 

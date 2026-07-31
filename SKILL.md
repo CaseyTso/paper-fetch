@@ -38,10 +38,31 @@ Always use `--json` so you can parse the structured response. Additional flags:
 - `--no-zotero` — save the PDF locally, skip Zotero
 - `--force` — re-acquire even if the paper is already cached or attached in Zotero
 
+## First-run health check
+
+Run `paper-fetch doctor --json` right after the CLI is installed and at the
+start of every new session, before the first fetch. `doctor` is read-only and
+never prints credentials. Act on the report:
+
+- For every check whose `status` is not `ok`, tell the user the single next
+  step from that check's `action` field.
+- Do **not** block an open-access fetch because optional fallback sources
+  (institution, Sci-Hub, ableSci) are unconfigured, and do not block a
+  `--no-zotero` fetch because Zotero is unconfigured.
+- When the user explicitly wants the Zotero attachment, or every source has
+  failed, walk through the failing checks and give the exact action for each,
+  linking to the README sections (`Institution access`, `Sci-Hub via Clash`,
+  `ableSci / 科研通`) or to `references/ablesci-login.md` /
+  `references/scihub-clash-setup.md`.
+- Before writing to `~/.paper-fetch/config.json`, state exactly which fields
+  you will add or change and get the user's explicit consent first.
+- Never ask the user for an ableSci password — the tool reads the Chrome
+  session; never echo cookie values or API keys into the chat.
+
 ## Acquisition policy
 
 1. **Open access first** — use PMC, Europe PMC, PubMed linkout and Unpaywall when they provide a valid PDF.
-2. **Institution before fallback services** — when an EasyConnect/aTrust proxy is configured or detectable, probe and attempt the institutional route before Sci-Hub or ableSci. Do not skip a configured institutional route merely because the publisher landing page initially appears paywalled.
+2. **Institution before fallback services** — when an EasyConnect/aTrust proxy is configured, or when `paper-fetch doctor` reports a running EasyConnect/aTrust client, probe and attempt the institutional route before Sci-Hub or ableSci. Do not skip a configured institutional route merely because the publisher landing page initially appears paywalled.
 3. **Do not over-interpret `no_pdf`** — an institutional landing-page probe that finds no PDF proves only that the transport worked but no candidate file was exposed; it does not prove that the institution lacks entitlement. Record the attempt and continue only after the institutional route is unavailable, unsuccessful, or explicitly not configured.
 4. **ableSci is asynchronous** — submitting a request is not a download failure. Poll the request/detail state before returning. Wait up to **60 seconds** (for example, 5-second intervals); if the request is still pending, return its request ID and a `pending`/`poll_timeout` outcome rather than pretending that no paper exists.
 
@@ -139,6 +160,8 @@ Fill credentials yourself; never commit personal config into the repository.
 ## References
 
 - `references/institution-access.md` — aTrust proxy probe and TLS troubleshooting
+- `references/ablesci-login.md` — ableSci/科研通 one-time Chrome login, cookies, and OpenCLI fallback
+- `references/scihub-clash-setup.md` — Clash HTTP/Mixed port setup and CAPTCHA handling
 - `references/zotero-upload-protocol.md` — Zotero Web API 4-step upload pitfalls
 - `references/ablesci-api-protocol.md` — ableSci HTTP API reverse-engineered protocol
 - `references/pubmed-linkout.md` — PubMed full-text link extraction

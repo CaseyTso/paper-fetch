@@ -189,7 +189,74 @@ uv tool install "git+https://github.com/CaseyTso/paper-fetch.git"
 }
 ```
 
-所有字段均可选。请填写自己的机构认证和 Zotero 信息。环境变量（例如 `PAPER_FETCH_ZOTERO_API_KEY`）优先于 JSON 配置。不要提交 API key、cookies、本地路径或下载的 PDF。
+所有字段均可选。只配置 `output_dir` 和 `unpaywall_email` 时，开放获取下载可以正常工作；**未配置的后备来源会保持关闭**：
+
+| 来源 | 启用所需的字段 | 未配置时的行为 |
+|---|---|---|
+| 机构访问 | `institution_socks5` | 跳过该来源 |
+| Sci-Hub | `clash_proxy` | 跳过该来源 |
+| 科研通 | `ablesci_url` + Chrome 登录 | 跳过该来源 |
+| Zotero | `zotero_library_id`、`zotero_library_type`、`zotero_inbox_collection_key`、`zotero_api_key` | PDF 仅保存到本地（等同 `--no-zotero`） |
+
+环境变量（例如 `PAPER_FETCH_ZOTERO_API_KEY`）优先于 JSON 配置。不要提交 API key、cookies、本地路径或下载的 PDF。
+
+### 首次配置自检：`paper-fetch doctor`
+
+安装 CLI 后先运行只读自检：
+
+```bash
+paper-fetch doctor --json
+```
+
+它不会写入任何内容，只检查：配置文件（存在、可解析、权限）、机构代理（已配置、URL 合法、端口可达；即使未配置也会提示检测到运行中的 EasyConnect/aTrust 客户端）、Clash 代理（同样的检查）、科研通会话（URL 已设置、Chrome cookies 可读、OpenCLI 后备可用）以及 Zotero 字段。
+
+- JSON `overall` 为 `ok` 表示全部就绪；`needs_configuration` 表示存在未配置的可选项目（退出码 0，开放获取下载仍可用）；`error` 表示配置文件无法读取（退出码 5）。
+- 每项检查都带 `action`——人类或 Agent 的下一步动作。
+- 报告不会输出凭据、cookie 值或 API key。
+
+### 机构访问（EasyConnect / aTrust）
+
+1. **先登录机构 VPN 客户端**（EasyConnect 或 aTrust），保持连接。
+2. **找到本地代理端口**：
+
+   ```bash
+   lsof -nP -iTCP -sTCP:LISTEN
+   ```
+
+   找到 VPN 客户端监听的端口。
+3. **区分 HTTP 与 SOCKS5**。aTrust 通常暴露的是 HTTP 代理，尽管字段名是 `institution_socks5`。探测候选端口：若 `curl -x http://127.0.0.1:<PORT> -sS -o /dev/null -w '%{http_code}\n' https://api.crossref.org` 返回 200，则配置 `http://...`；否则使用 `socks5h://...`。
+4. **配置**：
+
+   ```json
+   {
+     "institution_socks5": "http://127.0.0.1:<PORT>",
+     "institution_tls_verify": true
+   }
+   ```
+
+   `institution_tls_verify` 默认为 `true`；仅当 VPN 客户端使用本地 MITM 证书而 Python 不信任时才设为 `false`。该设置只影响机构来源。VPN 重启后端口可能变化——重新运行 `paper-fetch doctor` 确认。
+5. 用 `paper-fetch doctor --json` 验证（`institution` 一行应为 `ok`）。
+
+完整探测流程与排障：[`references/institution-access.md`](references/institution-access.md)。
+
+### 通过 Clash 使用 Sci-Hub
+
+1. 启动 Clash 并连接节点。
+2. 从客户端设置中读取 HTTP 或 Mixed 端口（ClashX 通常是 7890）——不要猜。
+3. 验证：`curl -x http://127.0.0.1:<PORT> -sS -o /dev/null -w '%{http_code}\n' https://api.ip.sb/ip` 应返回 200。
+4. 在配置文件中写入 `"clash_proxy": "http://127.0.0.1:<PORT>"`，再用 `paper-fetch doctor --json` 确认。
+5. 若 fetch 返回 `challenge_required`，在浏览器中打开返回的 Sci-Hub 网址完成验证码，然后重新运行命令。
+
+设置指南：[`references/scihub-clash-setup.md`](references/scihub-clash-setup.md)。
+
+### 科研通 ableSci
+
+1. 在 Chrome 中打开 <https://www.ablesci.com> 并**登录一次**。paper-fetch 从 Chrome cookies 读取会话，**不会保存或索要你的科研通密码**。
+2. 配置 `"ablesci_url": "https://www.ablesci.com"`。
+3. 若无法读取 cookies（Chrome cookie 库被锁、钥匙串被锁），当安装了 `opencli` 时 CLI 会回退到 OpenCLI Browser Bridge。`paper-fetch doctor --json` 会报告当前可用路径。
+4. 若 fetch 返回 `authentication_required`，在 Chrome 中重新登录科研通，再运行同一条命令。
+
+用户指南：[`references/ablesci-login.md`](references/ablesci-login.md)。
 
 ## Agent 使用方法
 
@@ -217,6 +284,8 @@ paper-fetch fetch '<论文标识>' --json
 - `--output <目录>`：覆盖输出目录。
 - `--no-zotero`：只保存到本地，不修改 Zotero。
 - `--force`：即使已有缓存或附件，也重新获取。
+
+首次下载前（或某个来源行为异常时）先运行 `paper-fetch doctor --json`，并按报告中的检查项行动（见[配置](#配置)）。
 
 示例：
 

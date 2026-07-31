@@ -69,6 +69,8 @@ def _init_mini_repo(tmp: Path) -> None:
             See `references/ablesci-api-protocol.md`
             See `references/pubmed-linkout.md`
             See `references/zotero-local-write-feasibility.md`
+            See `references/ablesci-login.md`
+            See `references/scihub-clash-setup.md`
             """
         ),
         encoding="utf-8",
@@ -81,6 +83,8 @@ def _init_mini_repo(tmp: Path) -> None:
         "ablesci-api-protocol.md",
         "pubmed-linkout.md",
         "zotero-local-write-feasibility.md",
+        "ablesci-login.md",
+        "scihub-clash-setup.md",
     ):
         (tmp / "references" / name).write_text(f"# {name}\n", encoding="utf-8")
 
@@ -153,6 +157,66 @@ class TestNumericLocalhostClashProxy:
         assert proc.returncode != 0, proc.stdout + proc.stderr
         combined = proc.stdout + proc.stderr
         assert "numeric_localhost_proxy" in combined
+
+
+class TestUntrackedControlledFiles:
+    def test_untracked_controlled_md_with_personal_path_fails(self, tmp_path: Path):
+        """Regression B: an untracked, non-ignored controlled file is scanned."""
+        _init_mini_repo(tmp_path)
+        home_marker = "/Users/" + "alice" + "-private"
+        ref = tmp_path / "references" / "new-user-guide.md"
+        ref.write_text(f"# new user guide\nlocal: {home_marker}\n", encoding="utf-8")
+        # deliberately NOT git-added: must still be scanned
+        proc = _run_checker(tmp_path)
+        assert proc.returncode != 0, proc.stdout + proc.stderr
+        combined = proc.stdout + proc.stderr
+        assert home_marker not in combined
+        assert "personal_home_path" in combined
+
+    def test_untracked_controlled_md_clean_passes(self, tmp_path: Path):
+        _init_mini_repo(tmp_path)
+        ref = tmp_path / "references" / "new-user-guide.md"
+        ref.write_text("# new user guide\nno secrets here\n", encoding="utf-8")
+        proc = _run_checker(tmp_path)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert "PUBLIC_CHECK_OK" in proc.stdout
+
+    def test_untracked_ignored_file_not_scanned(self, tmp_path: Path):
+        """A gitignored untracked file must not be scanned."""
+        _init_mini_repo(tmp_path)
+        gitignore = tmp_path / ".gitignore"
+        gitignore.write_text(
+            gitignore.read_text(encoding="utf-8") + "local-notes.md\n",
+            encoding="utf-8",
+        )
+        home_marker = "/Users/" + "bob" + "-local"
+        notes = tmp_path / "local-notes.md"
+        notes.write_text(f"# notes\nlocal: {home_marker}\n", encoding="utf-8")
+        proc = _run_checker(tmp_path)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert "PUBLIC_CHECK_OK" in proc.stdout
+
+
+class TestRequiredSkillRefs:
+    def test_missing_required_reference_fails(self, tmp_path: Path):
+        _init_mini_repo(tmp_path)
+        (tmp_path / "references" / "ablesci-login.md").unlink()
+        proc = _run_checker(tmp_path)
+        assert proc.returncode != 0, proc.stdout + proc.stderr
+        assert "missing" in proc.stdout + proc.stderr
+
+    def test_skill_without_reference_mention_fails(self, tmp_path: Path):
+        _init_mini_repo(tmp_path)
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            skill.read_text(encoding="utf-8").replace(
+                "See `references/scihub-clash-setup.md`\n", ""
+            ),
+            encoding="utf-8",
+        )
+        proc = _run_checker(tmp_path)
+        assert proc.returncode != 0, proc.stdout + proc.stderr
+        assert "reference_link" in proc.stdout + proc.stderr
 
 
 class TestAllowedPlaceholders:

@@ -10,6 +10,7 @@ from pathlib import Path
 import requests
 
 from .config import Config, load_config
+from .doctor import OVERALL_ERROR, format_human, run_doctor
 from .models import FetchResult, Status
 from .pipeline import Pipeline
 from .sources.ablesci import AbleSciSource
@@ -74,7 +75,19 @@ def main(argv: list[str] | None = None) -> int:
     fetch.add_argument("--force", action="store_true", help="Re-acquire even if cached")
     fetch.add_argument("--json", action="store_true", dest="json_output", help="Output structured JSON")
 
+    doctor = sub.add_parser("doctor", help="Check configuration and environment (read-only)")
+    doctor.add_argument("--json", action="store_true", dest="json_output", help="Output structured JSON")
+    doctor.add_argument("--config", default=None, help="Path to the config file (default ~/.paper-fetch/config.json)")
+
     args = parser.parse_args(argv)
+
+    if args.command == "doctor":
+        report = run_doctor(args.config)
+        if args.json_output:
+            json.dump(report, sys.stdout, indent=2, default=str)
+        else:
+            print(format_human(report))
+        return 5 if report["overall"] == OVERALL_ERROR else 0
 
     try:
         pipeline = _build_pipeline(args)

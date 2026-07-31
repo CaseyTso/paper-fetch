@@ -94,6 +94,8 @@ REQUIRED_SKILL_REFS = (
     "references/ablesci-api-protocol.md",
     "references/pubmed-linkout.md",
     "references/zotero-local-write-feasibility.md",
+    "references/ablesci-login.md",
+    "references/scihub-clash-setup.md",
 )
 
 # Non-secret public constants that may appear in both config and docs/code.
@@ -107,8 +109,52 @@ PUBLIC_CONSTANTS = {
 }
 
 
+def _untracked_controlled_files(root: Path) -> list[Path]:
+    """Untracked, non-ignored files that match the controlled globs.
+
+    ``git ls-files --others --exclude-standard`` respects .gitignore and the
+    repo's exclude file. Only files matching a controlled glob are returned,
+    so stray artifacts (JSON configs, archives, editor files) are not scanned.
+    """
+    try:
+        out = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(root),
+                "ls-files",
+                "-z",
+                "--others",
+                "--exclude-standard",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return []
+    controlled = {
+        p.resolve()
+        for pattern in CONTROLLED_GLOBS
+        for p in root.glob(pattern)
+        if p.is_file()
+    }
+    result: list[Path] = []
+    for raw in out.split(b"\0"):
+        if not raw:
+            continue
+        rel = raw.decode("utf-8", errors="replace")
+        p = root / rel
+        if p.is_file() and p.resolve() in controlled:
+            result.append(p)
+    return result
+
+
 def tracked_files(root: Path) -> list[Path]:
-    """Prefer git-tracked files; fall back to controlled globs without .git."""
+    """Prefer git-tracked files; fall back to controlled globs without .git.
+
+    In a git repository the scanned set is the union of tracked files and
+    untracked, non-ignored files matching a controlled glob — a new file
+    sitting in the working tree must not hide secrets until it is committed.
+    """
     git_dir = root / ".git"
     if git_dir.exists():
         try:
@@ -124,6 +170,7 @@ def tracked_files(root: Path) -> list[Path]:
                 p = root / rel
                 if p.is_file():
                     files.append(p)
+            files.extend(_untracked_controlled_files(root))
             return sorted(set(files))
         except (subprocess.CalledProcessError, FileNotFoundError, OSError):
             pass
