@@ -125,7 +125,7 @@ claude plugin marketplace add CaseyTso/paper-fetch
 claude plugin install paper-fetch@paper-fetch
 ```
 
-Reload plugins (`/reload-plugins`) or start a new Claude Code session. Invoke the skill with `/paper-fetch` (measured on Claude Code 2.1.81), or ask in natural language to download a paper PDF to Zotero.
+Reload plugins (`/reload-plugins`) or start a new Claude Code session. Invoke the skill with `/paper-fetch` (measured on Claude Code 2.1.220), or ask in natural language to download a paper PDF to Zotero.
 
 `plugin.json` sets `"skills": ["./"]` so the root `SKILL.md` is discovered on current Claude Code releases; Claude Code 2.1.142+ also auto-surfaces a root-level `SKILL.md` without that field.
 

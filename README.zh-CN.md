@@ -127,7 +127,7 @@ claude plugin marketplace add CaseyTso/paper-fetch
 claude plugin install paper-fetch@paper-fetch
 ```
 
-执行 `/reload-plugins` 或新开 Claude Code 会话。用 `/paper-fetch` 调用（Claude Code 2.1.81 实测），或用自然语言要求下载论文 PDF 到 Zotero。
+执行 `/reload-plugins` 或新开 Claude Code 会话。用 `/paper-fetch` 调用（Claude Code 2.1.220 实测），或用自然语言要求下载论文 PDF 到 Zotero。
 
 `plugin.json` 含 `"skills": ["./"]`，以便当前 Claude Code 发现根目录 `SKILL.md`；2.1.142+ 也可在无该字段时自动暴露根级 `SKILL.md`。
 
