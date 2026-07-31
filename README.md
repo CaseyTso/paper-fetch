@@ -359,6 +359,12 @@ The default test command excludes live tests. The public-package checker also va
 python scripts/check_public_package.py
 ```
 
+## License
+
+Copyright © 2026 CaseyTso.
+
+This project is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). If you modify the software and make it available to users over a network, the AGPL requires you to offer those users the corresponding source code. See `LICENSE` for the complete terms.
+
 ## Legal and access notice
 
 Use only sources and institutional access for which you are authorized. Respect publisher terms, institutional policies, applicable copyright law, and the terms of any external service.

@@ -2,6 +2,7 @@
   "name": "paper-fetch",
   "version": "0.3.0",
   "description": "Download a single academic paper PDF through ordered sources and optionally attach it to Zotero.",
+  "license": "AGPL-3.0-only",
   "author": {
     "name": "CaseyTso"
   },

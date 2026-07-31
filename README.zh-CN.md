@@ -331,6 +331,12 @@ uv run pytest -m live  # 需要网络、凭据或浏览器的测试
 python scripts/check_public_package.py
 ```
 
+## 开源协议
+
+Copyright © 2026 CaseyTso。
+
+本项目采用 [GNU Affero General Public License v3.0 only](LICENSE)（`AGPL-3.0-only`）。如果你修改本软件并通过网络向用户提供服务，AGPL 要求你向这些用户提供对应源代码。完整条款见 `LICENSE`。
+
 ## 合规提示
 
 只使用你有权访问的来源和机构服务。请遵守出版商条款、机构政策、适用的版权法律以及外部服务的使用条款。

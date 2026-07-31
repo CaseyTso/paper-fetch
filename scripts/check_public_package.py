@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 CONTROLLED_GLOBS = (
+    "LICENSE",
     "README.md",
     "SKILL.md",
     "pyproject.toml",
@@ -354,6 +355,28 @@ def main(argv: list[str] | None = None) -> int:
             errors.append("pyproject.toml:name: expected paper-fetch")
         if 'paper-fetch = "paper_fetch.cli:main"' not in pyproject:
             errors.append("pyproject.toml:scripts: missing paper-fetch CLI entry")
+        if 'license = "AGPL-3.0-only"' not in pyproject:
+            errors.append("pyproject.toml:license: expected AGPL-3.0-only")
+        if 'license-files = ["LICENSE"]' not in pyproject:
+            errors.append("pyproject.toml:license-files: expected LICENSE")
+
+    license_path = root / "LICENSE"
+    if not license_path.is_file():
+        errors.append("LICENSE:missing")
+    else:
+        license_text = license_path.read_text(encoding="utf-8")
+        if "GNU AFFERO GENERAL PUBLIC LICENSE" not in license_text:
+            errors.append("LICENSE:content: expected GNU AGPL text")
+        if "Version 3, 19 November 2007" not in license_text:
+            errors.append("LICENSE:version: expected AGPL version 3")
+
+    readme_path = root / "README.md"
+    if not readme_path.is_file():
+        errors.append("README.md:missing")
+    else:
+        readme = readme_path.read_text(encoding="utf-8")
+        if "AGPL-3.0-only" not in readme or "](LICENSE)" not in readme:
+            errors.append("README.md:license: expected AGPL-3.0-only link")
 
     skill_path = root / "SKILL.md"
     if not skill_path.is_file():
@@ -365,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
             errors.append("SKILL.md:name: expected paper-fetch")
         if not re.search(r"^version:\s*0\.3\.0\s*$", skill, re.M):
             errors.append("SKILL.md:version: expected 0.3.0")
+        if not re.search(r"^license:\s*AGPL-3\.0-only\s*$", skill, re.M):
+            errors.append("SKILL.md:license: expected AGPL-3.0-only")
 
     for ref in REQUIRED_SKILL_REFS:
         if not (root / ref).is_file():
@@ -411,6 +436,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"tracked_files={len(files)}")
     print("legacy_names=0")
     print("cli_entry=paper-fetch")
+    print("license=AGPL-3.0-only")
     print(f"skill_refs={len(REQUIRED_SKILL_REFS)}")
     if private_values is not None:
         print(f"private_fields_scanned={len(private_values)}")

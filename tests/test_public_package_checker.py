@@ -49,6 +49,8 @@ def _init_mini_repo(tmp: Path) -> None:
             [project]
             name = "paper-fetch"
             version = "0.3.0"
+            license = "AGPL-3.0-only"
+            license-files = ["LICENSE"]
 
             [project.scripts]
             paper-fetch = "paper_fetch.cli:main"
@@ -62,6 +64,7 @@ def _init_mini_repo(tmp: Path) -> None:
             ---
             name: paper-fetch
             version: 0.3.0
+            license: AGPL-3.0-only
             ---
 
             See `references/institution-access.md`
@@ -75,7 +78,14 @@ def _init_mini_repo(tmp: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (tmp / "README.md").write_text("# paper-fetch\n", encoding="utf-8")
+    (tmp / "README.md").write_text(
+        "# paper-fetch\n\nLicensed under [AGPL-3.0-only](LICENSE).\n",
+        encoding="utf-8",
+    )
+    (tmp / "LICENSE").write_text(
+        "GNU AFFERO GENERAL PUBLIC LICENSE\nVersion 3, 19 November 2007\n",
+        encoding="utf-8",
+    )
     (tmp / ".gitignore").write_text("PROGRESS.md\nBLOCKED.md\n", encoding="utf-8")
     for name in (
         "institution-access.md",
@@ -227,6 +237,7 @@ class TestAllowedPlaceholders:
             textwrap.dedent(
                 """\
                 # paper-fetch
+                Licensed under [AGPL-3.0-only](LICENSE).
                 "clash_proxy": "http://127.0.0.1:<PORT>"
                 "clash_proxy": "http://proxy.example:7890"
                 zotero://select/library/items/ABCD1234
@@ -244,3 +255,25 @@ class TestAllowedPlaceholders:
         proc = _run_checker(tmp_path)
         assert proc.returncode == 0, proc.stdout + proc.stderr
         assert "PUBLIC_CHECK_OK" in proc.stdout
+
+
+class TestLicenseContract:
+    def test_missing_license_file_fails(self, tmp_path: Path):
+        _init_mini_repo(tmp_path)
+        (tmp_path / "LICENSE").unlink()
+        proc = _run_checker(tmp_path)
+        assert proc.returncode != 0
+        assert "LICENSE:missing" in proc.stdout + proc.stderr
+
+    def test_mismatched_package_license_fails(self, tmp_path: Path):
+        _init_mini_repo(tmp_path)
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text(
+            pyproject.read_text(encoding="utf-8").replace(
+                'license = "AGPL-3.0-only"', 'license = "MIT"'
+            ),
+            encoding="utf-8",
+        )
+        proc = _run_checker(tmp_path)
+        assert proc.returncode != 0
+        assert "pyproject.toml:license" in proc.stdout + proc.stderr

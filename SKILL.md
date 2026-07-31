@@ -2,6 +2,7 @@
 name: paper-fetch
 description: Use when user wants to download a paper PDF to Zotero.
 version: 0.3.0
+license: AGPL-3.0-only
 ---
 
 # paper-fetch
