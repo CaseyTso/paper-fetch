@@ -141,11 +141,16 @@ class AbleSciSource:
         # 5. Submit the request (or detect duplicate)
         req_id = self._http_submit_request(self._session, csrf, doi, title)
         if not req_id:
-            # Submission likely succeeded (code=0) but no ID in response.
-            # Re-scan recent requests for our DOI.
-            hashid = self._http_find_existing_download(self._session, doi)
+            # Submission likely succeeded (code=0) but no ID in response
+            # (data: null). The new request is pending — ableSci fulfils
+            # asynchronously, so poll recent requests for a download link
+            # (up to 60 s) instead of giving up after one re-scan.
+            hashid = self._http_poll_for_existing_download(self._session, doi)
             if not hashid:
-                return None
+                return self._failure(
+                    Status.NOT_FOUND,
+                    "no PDF within 1 minute — ableSci request pending",
+                )
             dl_config = self._http_get_download_config(self._session, hashid)
             if not dl_config:
                 return None
@@ -286,6 +291,23 @@ class AbleSciSource:
                     continue
         except requests.RequestException:
             pass
+        return None
+
+    def _http_poll_for_existing_download(
+        self, session: requests.Session, doi: str,
+    ) -> Optional[str]:
+        """Poll recent requests for one matching *doi* that gains a download link.
+
+        Used when a submit succeeded but returned no request ID (data: null).
+        ableSci fulfils new requests asynchronously; poll every 5 s for up to
+        60 s (the same window as _http_poll_for_download).
+        """
+        deadline = _time.monotonic() + _POLL_TIMEOUT_S
+        while _time.monotonic() < deadline:
+            hashid = self._http_find_existing_download(session, doi)
+            if hashid:
+                return hashid
+            _time.sleep(5)
         return None
 
     def _http_scan_recent_requests(

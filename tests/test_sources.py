@@ -630,3 +630,103 @@ class TestAbleSciHttpPath:
             )
 
         assert result is None
+
+class TestAbleSciPendingPoll:
+    """Regression tests for the 'submit succeeded but data:null' polling fix.
+
+    ableSci returns {"code": 0, "msg": "...", "data": null} when a request is
+    created but no ID is echoed back. The old code re-scanned recent requests
+    exactly once and gave up while the new request was still pending; the fix
+    polls every 5 s for up to 60 s (see references/zotero-upload-protocol and
+    ablesci-api-protocol: 'Asynchronous request polling (mandatory)').
+    """
+
+    def test_poll_for_existing_download_waits_until_link_appears(self):
+        from paper_fetch.sources.ablesci import AbleSciSource
+        import paper_fetch.sources.ablesci as ablesci_mod
+
+        session = requests.Session()
+        source = AbleSciSource(session, Config(ablesci_url="https://ablesci.com"))
+
+        finder = MagicMock(side_effect=[None, None, "HASH123"])
+        with patch.object(AbleSciSource, "_http_find_existing_download", finder), \
+             patch.object(ablesci_mod._time, "sleep"):
+            result = source._http_poll_for_existing_download(
+                session, "10.1016/s2665-9913(26)00210-9"
+            )
+
+        assert result == "HASH123"
+        assert finder.call_count == 3
+
+    def test_poll_for_existing_download_timeout_returns_none(self):
+        from paper_fetch.sources.ablesci import AbleSciSource
+        import paper_fetch.sources.ablesci as ablesci_mod
+
+        session = requests.Session()
+        source = AbleSciSource(session, Config(ablesci_url="https://ablesci.com"))
+
+        finder = MagicMock(return_value=None)
+        # Fake clock: first read sets deadline (0 + 60), then each loop
+        # iteration advances 5 s; 65 > 60 terminates the loop.
+        clock = list(range(0, 75, 5))  # reads at 0 (deadline) then 5..70
+        with patch.object(AbleSciSource, "_http_find_existing_download", finder), \
+             patch.object(ablesci_mod._time, "monotonic", side_effect=clock), \
+             patch.object(ablesci_mod._time, "sleep"):
+            result = source._http_poll_for_existing_download(
+                session, "10.1016/s2665-9913(26)00210-9"
+            )
+
+        assert result is None
+        assert finder.call_count >= 11  # 60 s window, checks at t=5..55
+
+    def test_fetch_http_submit_no_id_polls_and_downloads(self):
+        from paper_fetch.sources.ablesci import AbleSciSource
+        from paper_fetch.models import SourceResult
+
+        session = requests.Session()
+        source = AbleSciSource(session, Config(ablesci_url="https://ablesci.com"))
+        identity = _make_identity(doi="10.1016/s2665-9913(26)00210-9",
+                                  title="Some paper")
+
+        ok = SourceResult.success_result(
+            source="ablesci", path=Path("/tmp/x.pdf")
+        )
+        download = MagicMock(return_value=ok)
+        poller = MagicMock(return_value="HASH123")
+
+        with patch.object(AbleSciSource, "_http_get_csrf", return_value="csrf123"), \
+             patch.object(AbleSciSource, "_http_submit_request", return_value=None), \
+             patch.object(AbleSciSource, "_http_find_existing_download", return_value=None), \
+             patch.object(AbleSciSource, "_http_poll_for_existing_download", poller), \
+             patch.object(AbleSciSource, "_http_get_download_config",
+                          return_value={"_csrf": "c", "hashid": "HASH123"}), \
+             patch.object(AbleSciSource, "_http_request_token",
+                          return_value={"host": "https://hub", "token": "t"}), \
+             patch.object(AbleSciSource, "_http_download_pdf", download):
+            result = source._fetch_http(identity, Path("/tmp/x.pdf"))
+
+        assert result is ok
+        poller.assert_called_once()
+        # pre-submit existence scan + post-submit poll both used the finder
+        download.assert_called_once()
+
+    def test_fetch_http_submit_no_id_pending_failure(self):
+        from paper_fetch.sources.ablesci import AbleSciSource
+        from paper_fetch.models import Status
+
+        session = requests.Session()
+        source = AbleSciSource(session, Config(ablesci_url="https://ablesci.com"))
+        identity = _make_identity(doi="10.1016/s2665-9913(26)00109-8",
+                                  title="Another paper")
+
+        with patch.object(AbleSciSource, "_http_get_csrf", return_value="csrf123"), \
+             patch.object(AbleSciSource, "_http_submit_request", return_value=None), \
+             patch.object(AbleSciSource, "_http_find_existing_download", return_value=None), \
+             patch.object(AbleSciSource, "_http_poll_for_existing_download", return_value=None):
+            result = source._fetch_http(identity, Path("/tmp/x.pdf"))
+
+        assert result is not None
+        assert result.success is False
+        assert result.status == Status.NOT_FOUND
+        assert "pending" in result.detail
+
