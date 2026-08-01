@@ -67,6 +67,42 @@ data = {
 
 The `params` field in the response (`auth["params"]`) contains S3 upload form fields — use those in Step 3, but never send them in the Step 2 request.
 
+## Pitfall 5: S3 auth may return legacy `prefix`/`suffix` instead of `params`
+
+The upload-authorisation response can come back in **either** of two formats:
+
+| Format | Response keys | S3 upload body |
+|---|---|---|
+| Modern | `url`, `params` (dict of form fields incl. `key`), `uploadKey` | multipart POST with `files=` payload (each param as a field + the file) |
+| Legacy | `url`, `contentType`, `prefix`, `suffix`, `uploadKey` | raw body = `prefix.encode() + file_bytes + suffix.encode()`, `Content-Type: auth["contentType"]` |
+
+For the legacy format the `prefix` string already ends with the file field's `Content-Disposition` header and boundary, and `suffix` is the closing `--` boundary. The boundary inside `contentType` is signed — you MUST use it verbatim, not generate your own.
+
+**Fix** (implemented in `src/paper_fetch/zotero.py` 2026-08-01): branch on `"prefix" in auth`:
+
+```python
+if "prefix" in auth and "suffix" in auth:
+    body = auth["prefix"].encode("utf-8") + pdf_path.read_bytes() + auth["suffix"].encode("utf-8")
+    resp = requests.post(auth["url"], data=body,
+                         headers={"Content-Type": auth["contentType"]},
+                         timeout=client._timeout * 3)
+else:
+    # modern params format: multipart files= payload
+```
+
+Symptom of the bug: S3 returns HTTP 400 `InvalidArgument — User key must have a length greater than 0` because `params` is absent and the code read `params.get("key", "")` → empty key.
+
+## Pitfall 6: DELETE requires `If-Unmodified-Since-Version`
+
+Single-item DELETE (`DELETE /items/{key}`) returns HTTP 428 `If-Unmodified-Since-Version must be provided for delete requests` without the header. Batch DELETE (`DELETE /items` with a JSON array body) silently returns 204 **without deleting** — do not trust the 204. Always delete with the header set to the item's current `version`, and verify with a follow-up GET:
+
+```python
+headers = {"Zotero-API-Key": ..., "Zotero-Write-Token": ..., "If-Unmodified-Since-Version": str(item["version"])}
+resp = session.delete(f"{base}/items/{key}", headers=headers, timeout=15)  # 204 = actually deleted
+```
+
+Delete children before their parent item.
+
 ## Full protocol
 
 1. **Create attachment item** — POST to `/items` with `itemType: attachment`, `linkMode: imported_file`, `contentType: application/pdf`, `filename`, `parentItem`. Include `Zotero-Write-Token` header (5-32 chars).

@@ -242,20 +242,35 @@ def attach_pdf(client: ZoteroClient, parent_key: str, pdf_path: Path) -> str | N
         return att_key
 
     # Step 3: Upload to S3 storage
-    params = auth.get("params", {})
-    s3_key = params.get("key", "")
-    files_payload = [("key", (None, s3_key))]
-    for k, v in params.items():
-        if k != "key":
-            files_payload.append((k, (None, str(v))))
-    files_payload.append(
-        ("file", (pdf_path.name, pdf_path.read_bytes(), "application/pdf"))
-    )
-
+    # Zotero returns either the modern `params` dict (S3 POST form fields) or
+    # the legacy `prefix`/`suffix` raw-multipart format. Handle both; the
+    # legacy format requires the exact boundary from auth["contentType"].
     try:
-        resp = requests.post(
-            auth["url"], files=files_payload, timeout=client._timeout * 3
-        )
+        if "prefix" in auth and "suffix" in auth:
+            body = (
+                auth["prefix"].encode("utf-8")
+                + pdf_path.read_bytes()
+                + auth["suffix"].encode("utf-8")
+            )
+            resp = requests.post(
+                auth["url"],
+                data=body,
+                headers={"Content-Type": auth["contentType"]},
+                timeout=client._timeout * 3,
+            )
+        else:
+            params = auth.get("params", {})
+            s3_key = params.get("key", "")
+            files_payload = [("key", (None, s3_key))]
+            for k, v in params.items():
+                if k != "key":
+                    files_payload.append((k, (None, str(v))))
+            files_payload.append(
+                ("file", (pdf_path.name, pdf_path.read_bytes(), "application/pdf"))
+            )
+            resp = requests.post(
+                auth["url"], files=files_payload, timeout=client._timeout * 3
+            )
         resp.raise_for_status()
     except requests.RequestException:
         return None
