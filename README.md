@@ -365,6 +365,13 @@ Copyright © 2026 CaseyTso.
 
 This project is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`). If you modify the software and make it available to users over a network, the AGPL requires you to offer those users the corresponding source code. See `LICENSE` for the complete terms.
 
+## Acknowledgements
+
+paper-fetch incorporates designs adapted from
+[scansci-pdf](https://github.com/Rimagination/scansci-pdf),
+Copyright © 2024–2026 scansci-pdf contributors,
+licensed under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
 ## Legal and access notice
 
 Use only sources and institutional access for which you are authorized. Respect publisher terms, institutional policies, applicable copyright law, and the terms of any external service.

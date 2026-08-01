@@ -1,0 +1,28 @@
+paper-fetch
+Copyright © 2026 CaseyTso
+
+This software incorporates work derived from scansci-pdf
+(https://github.com/Rimagination/scansci-pdf),
+Copyright © 2024–2026 scansci-pdf contributors,
+licensed under the Apache License, Version 2.0.
+
+Licensed under the GNU Affero General Public License v3.0 only (AGPL-3.0-only).
+See LICENSE for the complete terms.
+
+==========================================================================
+Apache 2.0 license notice (for derived portions)
+==========================================================================
+
+   Copyright 2024-2026 scansci-pdf contributors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

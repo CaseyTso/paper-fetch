@@ -1,4 +1,9 @@
-"""ableSci/科研通 fallback via OpenCLI Browser Bridge."""
+"""ableSci/科研通 fallback via OpenCLI Browser Bridge.
+
+Adapted from scansci-pdf — ableSci HTTP API protocol and OpenCLI integration
+originally designed by Rimagination.
+https://github.com/Rimagination/scansci-pdf (Apache 2.0)
+"""
 
 from __future__ import annotations
 
