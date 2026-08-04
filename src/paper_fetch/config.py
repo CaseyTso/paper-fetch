@@ -13,7 +13,9 @@ CONFIG_DIR = Path.home() / ".paper-fetch"
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "config.json"
 
 DEFAULT_SCIHUB_DOMAINS: tuple[str, ...] = (
-    "https://sci-hub.se",
+    # sci-hub.jp is the current primary mirror; .st/.ru redirect here.
+    # sci-hub.se was dropped: its edge terminates TLS (SSL UNEXPECTED_EOF).
+    "https://sci-hub.jp",
     "https://sci-hub.st",
     "https://sci-hub.ru",
 )

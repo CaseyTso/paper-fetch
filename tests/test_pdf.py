@@ -126,6 +126,12 @@ class TestExtractPdfCandidates:
         candidates = extract_pdf_candidates(html, "https://example.com/dir/")
         assert "https://example.com/pdf/article.pdf" in candidates
 
+    def test_object_data(self):
+        """Sci-Hub article pages embed the PDF via <object data=...>."""
+        html = '<object type="application/pdf" data="/storage/2024/7339/paper.pdf"></object>'
+        candidates = extract_pdf_candidates(html, "https://sci-hub.jp/10.1000/xyz")
+        assert "https://sci-hub.jp/storage/2024/7339/paper.pdf" in candidates
+
     def test_anchor_pdf(self):
         html = '<a href="download.pdf">PDF</a>'
         candidates = extract_pdf_candidates(html, "https://example.com/")

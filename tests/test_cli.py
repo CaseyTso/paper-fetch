@@ -9,7 +9,7 @@ from paper_fetch.cli import main
 
 
 def test_package_imports():
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.4.0"
 
 
 def test_public_package_and_cli_names_are_paper_fetch():

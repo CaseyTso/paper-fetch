@@ -245,7 +245,7 @@ paper-fetch doctor --json
 2. 从客户端设置中读取 HTTP 或 Mixed 端口（ClashX 通常是 7890）——不要猜。
 3. 验证：`curl -x http://127.0.0.1:<PORT> -sS -o /dev/null -w '%{http_code}\n' https://api.ip.sb/ip` 应返回 200。
 4. 在配置文件中写入 `"clash_proxy": "http://127.0.0.1:<PORT>"`，再用 `paper-fetch doctor --json` 确认。
-5. 若 fetch 返回 `challenge_required`，在浏览器中打开返回的 Sci-Hub 网址完成验证码，然后重新运行命令。
+5. Sci-Hub 验证码会自动求解：CLI 检测到 ALTCHA 工作量证明页后自动计算并带 cookie 重试。仅当自动求解失败时 fetch 才返回 `challenge_required`（此时可在浏览器打开该网址人工完成后再重跑）。
 
 设置指南：[`references/scihub-clash-setup.md`](references/scihub-clash-setup.md)。
 
@@ -306,7 +306,7 @@ paper-fetch fetch \
 3. **Sci-Hub**：Clash HTTP 代理
 4. **科研通 ableSci**：Chrome cookies HTTP API，必要时回退到 OpenCLI Browser Bridge
 
-科研通请求可能是异步的。`pending` 或 `poll_timeout` 表示请求仍在处理，不代表论文不存在。`authentication_required` 或 CAPTCHA 状态需要用户完成浏览器操作后重新调用。
+科研通请求可能是异步的。`pending` 或 `poll_timeout` 表示请求仍在处理，不代表论文不存在。`authentication_required` 需要用户登录科研通后重跑；Sci-Hub 的 ALTCHA 挑战会自动求解，`challenge_required` 仅在自动求解失败时出现。
 
 ## Zotero 集成
 

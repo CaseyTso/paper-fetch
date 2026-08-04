@@ -325,14 +325,101 @@ class TestSciHub:
                 result = source.fetch(_make_identity(), dest)
         assert result.success is True
 
-    def test_challenge_detected(self):
+    def test_challenge_solve_failure_returns_challenge_required(self):
         session = requests.Session()
 
         def side_effect(url, timeout=None, proxies=None, allow_redirects=True, stream=None, **kwargs):
             resp = MagicMock()
             resp.status_code = 200
             resp.headers = {"content-type": "text/html"}
+            resp.url = url
             resp.text = "<html><body>Just a moment... Checking your browser</body></html>"
+            return resp
+
+        with (
+            patch.object(session, "get", side_effect=side_effect),
+            patch("paper_fetch.sources.scihub.solve_altcha", return_value=False),
+        ):
+            source = SciHubSource(
+                session,
+                Config(
+                    clash_proxy="http://proxy.example:7897",
+                    scihub_domains=("https://sci-hub.se",),
+                ),
+            )
+            with tempfile.TemporaryDirectory() as td:
+                dest = Path(td) / "out.pdf"
+                result = source.fetch(_make_identity(), dest)
+        assert result.success is False
+        assert result.status == Status.CHALLENGE_REQUIRED
+
+    def test_challenge_solved_then_retries_and_downloads(self):
+        """Challenge page → auto-solve → retry lands on article → object PDF."""
+        session = requests.Session()
+        article_html = (
+            "<html><body>Sci-Hub. Astrocytic paper"
+            '<object type="application/pdf" data="/storage/2024/7339/paper.pdf">'
+            "</object></body></html>"
+        )
+
+        landing_gets = {"count": 0}
+
+        def side_effect(url, timeout=None, proxies=None, allow_redirects=True, stream=None, **kwargs):
+            if "/storage/" in url:
+                return _fake_pdf_response()
+            landing_gets["count"] += 1
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.headers = {"content-type": "text/html"}
+            resp.url = url
+            if landing_gets["count"] == 1:
+                resp.text = (
+                    '<html><body><altcha-widget challengeurl="/captcha/challenge/12345">'
+                    "</body></html>"
+                )
+            else:
+                resp.text = article_html
+            return resp
+
+        with (
+            patch.object(session, "get", side_effect=side_effect),
+            patch("paper_fetch.sources.scihub.solve_altcha", return_value=True) as mock_solve,
+        ):
+            source = SciHubSource(
+                session,
+                Config(
+                    clash_proxy="http://proxy.example:7897",
+                    scihub_domains=("https://sci-hub.jp",),
+                ),
+            )
+            with tempfile.TemporaryDirectory() as td:
+                dest = Path(td) / "out.pdf"
+                result = source.fetch(_make_identity(), dest)
+        assert result.success is True
+        assert result.status == Status.SUCCESS
+        mock_solve.assert_called_once()
+
+    def test_article_page_with_report_widget_is_not_challenge(self):
+        """Article pages embed an ALTCHA 'report' widget (no challenge id)
+        plus altcha.min.js — they must be treated as articles, not challenges."""
+        session = requests.Session()
+        article_html = (
+            "<html><body>Sci-Hub. Astrocytic paper"
+            '<object type="application/pdf" data="/storage/2024/7339/paper.pdf"></object>'
+            '<altcha-widget style="--altcha-border-width:0" challengeurl="/captcha/challenge" '
+            "hidelogo hidefooter></altcha-widget>"
+            '<script src="/scripts/altcha.min.js"></script>'
+            "</body></html>"
+        )
+
+        def side_effect(url, timeout=None, proxies=None, allow_redirects=True, stream=None, **kwargs):
+            if "/storage/" in url:
+                return _fake_pdf_response()
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.headers = {"content-type": "text/html"}
+            resp.url = url
+            resp.text = article_html
             return resp
 
         with patch.object(session, "get", side_effect=side_effect):
@@ -340,7 +427,66 @@ class TestSciHub:
                 session,
                 Config(
                     clash_proxy="http://proxy.example:7897",
-                    scihub_domains=("https://sci-hub.se",),
+                    scihub_domains=("https://sci-hub.jp",),
+                ),
+            )
+            with tempfile.TemporaryDirectory() as td:
+                dest = Path(td) / "out.pdf"
+                result = source.fetch(_make_identity(), dest)
+        assert result.success is True
+        assert result.status == Status.SUCCESS
+
+    def test_challenge_failure_continues_to_next_domain(self):
+        """A failed solve must not short-circuit the remaining domains."""
+        session = requests.Session()
+
+        def side_effect(url, timeout=None, proxies=None, allow_redirects=True, stream=None, **kwargs):
+            if "sci-hub.jp" in url:
+                return _fake_pdf_response()
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.headers = {"content-type": "text/html"}
+            resp.url = url
+            resp.text = "<html><body>altcha-widget checking your browser</body></html>"
+            return resp
+
+        with (
+            patch.object(session, "get", side_effect=side_effect),
+            patch("paper_fetch.sources.scihub.solve_altcha", return_value=False),
+        ):
+            source = SciHubSource(
+                session,
+                Config(
+                    clash_proxy="http://proxy.example:7897",
+                    scihub_domains=("https://sci-hub.st", "https://sci-hub.jp"),
+                ),
+            )
+            with tempfile.TemporaryDirectory() as td:
+                dest = Path(td) / "out.pdf"
+                result = source.fetch(_make_identity(), dest)
+        assert result.success is True
+        assert result.status == Status.SUCCESS
+
+    def test_all_domains_challenge_returns_challenge(self):
+        session = requests.Session()
+
+        def side_effect(url, timeout=None, proxies=None, allow_redirects=True, stream=None, **kwargs):
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.headers = {"content-type": "text/html"}
+            resp.url = url
+            resp.text = "<html><body>altcha-widget checking your browser</body></html>"
+            return resp
+
+        with (
+            patch.object(session, "get", side_effect=side_effect),
+            patch("paper_fetch.sources.scihub.solve_altcha", return_value=False),
+        ):
+            source = SciHubSource(
+                session,
+                Config(
+                    clash_proxy="http://proxy.example:7897",
+                    scihub_domains=("https://sci-hub.st", "https://sci-hub.ru"),
                 ),
             )
             with tempfile.TemporaryDirectory() as td:

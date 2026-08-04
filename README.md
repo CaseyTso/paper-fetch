@@ -265,8 +265,10 @@ Full probe procedure and troubleshooting:
    should return 200.
 4. Configure `"clash_proxy": "http://127.0.0.1:<PORT>"` in the config file
    and confirm with `paper-fetch doctor --json`.
-5. If a fetch returns `challenge_required`, open the reported Sci-Hub URL in
-   your browser, complete the CAPTCHA, and rerun the command.
+5. Sci-Hub challenges are solved automatically: the CLI detects the ALTCHA
+   proof-of-work page, solves it, and retries with the resulting cookie.
+   Only if automatic solving fails does a fetch return `challenge_required`
+   (open the URL in a browser as a last resort, then rerun).
 
 Setup guide: [`references/scihub-clash-setup.md`](references/scihub-clash-setup.md).
 
@@ -334,7 +336,7 @@ The pipeline stops at the first valid multi-page PDF:
 3. **Sci-Hub** — Clash HTTP proxy
 4. **ableSci/科研通** — Chrome-cookie HTTP API, then OpenCLI Browser Bridge fallback
 
-The ableSci request may be asynchronous. `pending` or `poll_timeout` means the request is still processing, not that the paper is missing. Authentication and CAPTCHA statuses require the user to complete the browser step and rerun the command.
+The ableSci request may be asynchronous. `pending` or `poll_timeout` means the request is still processing, not that the paper is missing. `authentication_required` needs the user to log in to ableSci and rerun. Sci-Hub ALTCHA challenges are solved automatically, so `challenge_required` only appears when automatic solving failed.
 
 ## Zotero integration
 

@@ -8,7 +8,7 @@ configure in `clash_proxy`.
 
 Start your Clash client (ClashX, Clash Verge, Clash for Windows, ...) and
 make sure it is connected to a working node. Many default rule sets already
-route `sci-hub.se`, `sci-hub.st`, and `sci-hub.ru` through the proxy; if the
+route `sci-hub.jp`, `sci-hub.st`, and `sci-hub.ru` through the proxy; if the
 Sci-Hub source later reports a network error, check the node and the rules.
 
 ## 2. Find the HTTP / Mixed port
@@ -45,12 +45,23 @@ In `~/.paper-fetch/config.json`:
 
 Then rerun `paper-fetch doctor --json` — the `clash` check should be `ok`.
 
-## 5. CAPTCHA / challenge pages
+## 5. ALTCHA challenge pages
 
-Sci-Hub sometimes presents a CAPTCHA/ALTCHA. paper-fetch returns
-`challenge_required` in that case. Open the reported Sci-Hub URL in your
-browser, complete the challenge, then rerun the same `paper-fetch fetch`
-command.
+Sci-Hub's mirrors (currently sci-hub.jp, behind DDoS-Guard) present an
+ALTCHA proof-of-work page instead of the article. paper-fetch solves it
+automatically:
+
+1. The challenge page embeds a widget with a per-request challenge id.
+2. The CLI fetches the challenge JSON and brute-forces the nonce
+   (`SHA-256(salt + number) == challenge` over `[0, maxNumber)`, typically
+   sub-second).
+3. It submits the solution and retries the article page with the resulting
+   cookie. No browser is involved.
+
+`challenge_required` is only returned when automatic solving fails (network
+drop, server-side change, or the challenge id cannot be extracted). In that
+case open the reported Sci-Hub URL in your browser, complete the challenge,
+and rerun the same `paper-fetch fetch` command.
 
 ## Troubleshooting
 
@@ -58,4 +69,5 @@ command.
 |---|---|---|
 | `proxy_unavailable` / connection refused | wrong port, or Clash not running | re-check the port from step 2 |
 | network error / timeout | node down, or Sci-Hub domain blocked | switch node; the CLI tries `scihub_domains` in order |
-| `challenge_required` | CAPTCHA presented | complete it in a browser, then rerun |
+| `challenge_required` | automatic ALTCHA solving failed | rerun (transient), or complete the challenge in a browser and rerun |
+| repeated `challenge_required` after browser solve | stale nonce cookie in another tool | use a fresh session; paper-fetch uses a new session per run |

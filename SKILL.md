@@ -1,7 +1,7 @@
 ---
 name: paper-fetch
 description: Use when user wants to download a paper PDF to Zotero.
-version: 0.3.0
+version: 0.4.0
 license: AGPL-3.0-only
 ---
 
@@ -108,7 +108,7 @@ The fetcher must distinguish a completed download from an asynchronous ableSci r
 | Status | What to do |
 |---|---|
 | `authentication_required` | Ask the user to log in to ableSci in their browser, then rerun the command. |
-| `challenge_required` | Ask the user to open the Sci-Hub page in their browser, complete the CAPTCHA/ALTCHA, then rerun the command. |
+| `challenge_required` | Automatic ALTCHA solving failed. Open the reported Sci-Hub URL in a browser, complete the CAPTCHA, then rerun the command. |
 | `pending` / `poll_timeout` | Do **not** call this a missing paper. Report the ableSci request ID and that the request remained pending after the 60-second polling window; rerun later or inspect the request directly. |
 
 After the user confirms they have completed the manual step, re-run the same `paper-fetch fetch` command.
@@ -122,7 +122,12 @@ The CLI uses a **two-tier approach** for ableSci/科研通 downloads:
 
 For both ableSci paths, request creation and file availability are separate events. After submitting a new request, poll the request detail/recent-request state every ~5 seconds for up to **60 seconds**. Use a fresh page/state read on every poll (do not retain stale browser element refs or a stale detail page). Stop early when a valid download link appears; otherwise return `pending`/`poll_timeout` with the request ID for later retry. A newly created request with no download link is not a failed acquisition.
 
-For Sci-Hub, the CLI uses OpenCLI only when a CAPTCHA challenge is detected (`challenge_required`). In that case, open the provided URL manually, complete the challenge, and rerun the command.
+For Sci-Hub, the CLI detects the ALTCHA challenge page and solves the
+proof-of-work automatically (brute-force SHA-256 over the nonce range, then
+submits the solution and retries with the resulting cookie). No browser is
+involved. Only if automatic solving fails does the fetch return
+`challenge_required`; in that case, open the reported URL manually, complete
+the challenge, and rerun the command.
 
 All other browser operations are silent and invisible to you.
 

@@ -133,9 +133,9 @@ class _PDFCandidateParser(HTMLParser):
                 if content:
                     self.candidates.append(content)
 
-        # iframe, embed, object → src
-        if tag in ("iframe", "embed"):
-            src = attr_map.get("src", "")
+        # iframe, embed, object → src (object uses data=)
+        if tag in ("iframe", "embed", "object"):
+            src = attr_map.get("src") or attr_map.get("data", "")
             if src:
                 self.candidates.append(src)
 
