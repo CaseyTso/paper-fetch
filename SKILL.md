@@ -11,7 +11,27 @@ Download a single academic paper PDF through four ordered sources and attach it 
 
 CLI tool: `paper-fetch` — install from [CaseyTso/paper-fetch](https://github.com/CaseyTso/paper-fetch)
 
-Install the user-level CLI directly from GitHub when it is not already available:
+Run the bundled cross-platform installer (recommended — it auto-detects the
+environment and sidesteps the known pitfalls, especially on iSH/Alpine):
+
+```bash
+sh scripts/minis-install.sh     # from a clone of this repo / the skill dir
+```
+
+What the installer does per environment:
+
+- **macOS / glibc Linux with `uv`** → official `uv tool install` (one line, cached wheels)
+- **macOS / glibc Linux without `uv`** → venv + pip (wheels exist)
+- **iSH / Alpine / any musl+aarch64** → `apk add py3-lz4 py3-lz4-pyc`, then a
+  `--system-site-packages` venv + pip for the rest. A plain `uv tool install`
+  **fails** here: `lz4` and `pycryptodomex` (both pulled in by
+  `browser-cookie3`) ship C extensions with no `musllinux_aarch64` wheel and
+  cannot be compiled from source in iSH.
+- When the skill lives under `/var/minis/skills/`, it also writes a
+  `paper-fetch` launcher script in the skill dir that activates the venv, so
+  `paper-fetch ...` works from any shell.
+
+Manual equivalent on normal systems, when the installer is unavailable:
 
 ```bash
 uv tool install "git+https://github.com/CaseyTso/paper-fetch.git"
