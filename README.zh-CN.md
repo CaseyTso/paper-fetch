@@ -64,8 +64,10 @@ paper-fetch --help
 
 ## Minis（iOS / iSH）适配
 
-paper-fetch 将 **Minis**（iSH/iOS 终端）视为一等公民环境。安装器和 CLI
-会自动检测（`/var/minis` 存在且 PATH 中有 `minis-browser-use`）并适配：
+paper-fetch 将 **Minis**——跨平台 AI 智能体应用
+（[OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis)，GPL-3.0，
+OpenMinis 作者开发）——视为一等公民环境。安装器和 CLI 会自动检测
+（`/var/minis` 存在且 PATH 中有 `minis-browser-use`）并适配：
 
 ### Minis 环境的行为差异
 
@@ -413,6 +415,12 @@ Copyright © 2026 CaseyTso。
 本项目采用 [GNU Affero General Public License v3.0 only](LICENSE)（`AGPL-3.0-only`）。如果你修改本软件并通过网络向用户提供服务，AGPL 要求你向这些用户提供对应源代码。完整条款见 `LICENSE`。
 
 ## 致谢
+
+特别感谢 **OpenMinis** 项目
+（[OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis)，
+<https://openminis.app>，GPL-3.0）及其作者，感谢他们构建了 paper-fetch
+所运行的 Minis 智能体应用——Minis WebView 驱动（`ablesci_browser.py`）、
+iSH 安装器 profile 和双安装路径都离不开它。
 
 paper-fetch 的部分设计改编自
 [scansci-pdf](https://github.com/Rimagination/scansci-pdf)，

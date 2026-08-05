@@ -65,8 +65,10 @@ paper-fetch --help
 
 ## Minis (iOS / iSH) support
 
-paper-fetch runs inside **Minis** (the iSH/iOS shell) as a first-class
-environment. The installer and the CLI detect it automatically
+paper-fetch runs inside **Minis** — the cross-platform AI agent app
+([OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis), GPL-3.0, by
+the OpenMinis authors) as a first-class environment. The installer and the
+CLI detect it automatically
 (`/var/minis` exists and `minis-browser-use` is on PATH) and adapt:
 
 ### What changes inside Minis
@@ -450,7 +452,14 @@ This project is licensed under the [GNU Affero General Public License v3.0 only]
 
 ## Acknowledgements
 
-paper-fetch incorporates designs adapted from
+Special thanks to the **OpenMinis** project
+([OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis),
+<https://openminis.app>, GPL-3.0) and its authors for building the Minis
+agent app that paper-fetch runs in — the Minis WebView driver
+(`ablesci_browser.py`), the iSH installer profile, and the dual install
+paths would not exist without it.
+
+paper-fetch also incorporates designs adapted from
 [scansci-pdf](https://github.com/Rimagination/scansci-pdf),
 Copyright © 2024–2026 scansci-pdf contributors,
 licensed under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
