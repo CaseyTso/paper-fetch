@@ -333,24 +333,21 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc))
             return 1
 
-    init_path = root / "src/paper_fetch/__init__.py"
-    if not init_path.is_file():
-        errors.append("src/paper_fetch/__init__.py:missing")
-    else:
-        init_text = init_path.read_text(encoding="utf-8")
-        m = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
-        if not m or m.group(1) != "0.3.0":
-            errors.append(
-                f"src/paper_fetch/__init__.py:version: expected 0.3.0, got {m.group(1) if m else None}"
-            )
-
+    # pyproject.toml is the single source of truth for the expected version;
+    # __init__.py and SKILL.md must match it (see cefae86: version bumps must
+    # not require editing this checker).
     pyproject_path = root / "pyproject.toml"
+    expected_version: str | None = None
     if not pyproject_path.is_file():
         errors.append("pyproject.toml:missing")
+        pyproject = ""
     else:
         pyproject = pyproject_path.read_text(encoding="utf-8")
-        if not re.search(r'^version\s*=\s*"0\.3\.0"\s*$', pyproject, re.M):
-            errors.append("pyproject.toml:version: expected 0.3.0")
+        m = re.search(r'^version\s*=\s*"([^"]+)"\s*$', pyproject, re.M)
+        if not m:
+            errors.append("pyproject.toml:version: missing or unparseable")
+        else:
+            expected_version = m.group(1)
         if 'name = "paper-fetch"' not in pyproject:
             errors.append("pyproject.toml:name: expected paper-fetch")
         if 'paper-fetch = "paper_fetch.cli:main"' not in pyproject:
@@ -359,6 +356,17 @@ def main(argv: list[str] | None = None) -> int:
             errors.append("pyproject.toml:license: expected AGPL-3.0-only")
         if 'license-files = ["LICENSE"]' not in pyproject:
             errors.append("pyproject.toml:license-files: expected LICENSE")
+
+    init_path = root / "src/paper_fetch/__init__.py"
+    if not init_path.is_file():
+        errors.append("src/paper_fetch/__init__.py:missing")
+    elif expected_version is not None:
+        init_text = init_path.read_text(encoding="utf-8")
+        m = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
+        if not m or m.group(1) != expected_version:
+            errors.append(
+                f"src/paper_fetch/__init__.py:version: expected {expected_version}, got {m.group(1) if m else None}"
+            )
 
     license_path = root / "LICENSE"
     if not license_path.is_file():
@@ -386,8 +394,10 @@ def main(argv: list[str] | None = None) -> int:
         skill = skill_path.read_text(encoding="utf-8")
         if not re.search(r"^name:\s*paper-fetch\s*$", skill, re.M):
             errors.append("SKILL.md:name: expected paper-fetch")
-        if not re.search(r"^version:\s*0\.3\.0\s*$", skill, re.M):
-            errors.append("SKILL.md:version: expected 0.3.0")
+        if expected_version is not None and not re.search(
+            rf"^version:\s*{re.escape(expected_version)}\s*$", skill, re.M
+        ):
+            errors.append(f"SKILL.md:version: expected {expected_version}")
         if not re.search(r"^license:\s*AGPL-3\.0-only\s*$", skill, re.M):
             errors.append("SKILL.md:license: expected AGPL-3.0-only")
 
@@ -432,7 +442,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print("PUBLIC_CHECK_OK")
-    print("version=0.3.0")
+    print(f"version={expected_version}")
     print(f"tracked_files={len(files)}")
     print("legacy_names=0")
     print("cli_entry=paper-fetch")
