@@ -57,6 +57,7 @@ class Config:
     zotero_inbox_collection_key: str | None = None
     zotero_api_key: str | None = None
     ablesci_url: str | None = None
+    ablesci_driver: str | None = None  # auto | http | browser | opencli
     request_timeout: float = 30.0
     pdf_validation_retries: int = 1
 

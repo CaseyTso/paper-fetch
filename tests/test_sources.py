@@ -562,6 +562,7 @@ class TestAbleSci:
             patch("browser_cookie3.chrome") as mock_chrome,
             patch("subprocess.run") as mock_run,
             patch("paper_fetch.sources.ablesci._POLL_TIMEOUT_S", 1),
+            patch("paper_fetch.sources.ablesci.is_minis_env", return_value=False),
         ):
             # HTTP path: cookies fail → fallback to OpenCLI
             mock_chrome.side_effect = Exception("no Chrome")
@@ -600,6 +601,7 @@ class TestAbleSci:
             patch("browser_cookie3.chrome") as mock_chrome,
             patch.object(session, "get") as mock_get,
             patch.object(session, "post") as mock_post,
+            patch("paper_fetch.sources.ablesci.is_minis_env", return_value=False),
         ):
             # Mock cookie reading
             mock_cookie = MagicMock()
@@ -685,6 +687,7 @@ class TestAbleSci:
             patch("browser_cookie3.chrome") as mock_chrome,
             patch("subprocess.run") as mock_run,
             patch("paper_fetch.sources.ablesci._POLL_TIMEOUT_S", 1),
+            patch("paper_fetch.sources.ablesci.is_minis_env", return_value=False),
         ):
             # browser_cookie3 raises an exception → HTTP path returns None
             mock_chrome.side_effect = Exception("no Chrome")
@@ -840,7 +843,8 @@ class TestAbleSciPendingPoll:
         download = MagicMock(return_value=ok)
         poller = MagicMock(return_value="HASH123")
 
-        with patch.object(AbleSciSource, "_http_get_csrf", return_value="csrf123"), \
+        with patch("browser_cookie3.chrome", return_value=[]), \
+             patch.object(AbleSciSource, "_http_get_csrf", return_value="csrf123"), \
              patch.object(AbleSciSource, "_http_submit_request", return_value=None), \
              patch.object(AbleSciSource, "_http_find_existing_download", return_value=None), \
              patch.object(AbleSciSource, "_http_poll_for_existing_download", poller), \
@@ -865,7 +869,8 @@ class TestAbleSciPendingPoll:
         identity = _make_identity(doi="10.1016/s2665-9913(26)00109-8",
                                   title="Another paper")
 
-        with patch.object(AbleSciSource, "_http_get_csrf", return_value="csrf123"), \
+        with patch("browser_cookie3.chrome", return_value=[]), \
+             patch.object(AbleSciSource, "_http_get_csrf", return_value="csrf123"), \
              patch.object(AbleSciSource, "_http_submit_request", return_value=None), \
              patch.object(AbleSciSource, "_http_find_existing_download", return_value=None), \
              patch.object(AbleSciSource, "_http_poll_for_existing_download", return_value=None):

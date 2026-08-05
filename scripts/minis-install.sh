@@ -3,16 +3,21 @@
 # minis-install.sh — cross-platform installer for the paper-fetch CLI skill.
 #
 # Designed to "just work" across the environments where Minis (or any other
-# host shell) runs, by detecting the platform and using the smoothest path:
+# host shell) runs, by detecting the platform and using the smoothest path.
 #
-#   * Normal macOS / glibc Linux with uv  → official `uv tool install`
-#     (wheels cached, one line, no Python toolchain needed)
-#   * Normal macOS / glibc Linux, no uv   → venv + pip (wheels exist)
-#   * iSH / Alpine / any musl+aarch64     → apk-provided prebuilt lz4 +
-#     venv --system-site-packages + pip for the rest. Plain `uv tool install`
-#     FAILS here because `lz4` and `pycryptodomex` (both pulled by
-#     browser-cookie3) ship C extensions with no musllinux_aarch64 wheel and
-#     cannot be compiled from source in iSH.
+# Two installation profiles are detected automatically:
+#
+#   * Minis / iSH / iOS  → Minis profile. ableSci uses the in-app WebView
+#     driver (`minis-browser-use`) instead of Chrome cookies / OpenCLI, which
+#     cannot work in the iSH sandbox (no DBUS, no access to the iOS Chrome
+#     cookie store, Aliyun WAF blocks plain HTTP clients). Dependencies are
+#     installed from Alpine packages + a --system-site-packages venv.
+#
+#   * Normal macOS / glibc Linux → classic profile.
+#       - with uv  → official `uv tool install` (wheels cached, one line)
+#       - no uv    → venv + pip (wheels exist)
+#       ableSci uses Chrome cookies (browser-cookie3) with the OpenCLI
+#       fallback, exactly as before.
 #
 # The installer also writes a `paper-fetch` wrapper into the skill dir that
 # activates the venv, so `paper-fetch ...` works regardless of how the venv
@@ -54,6 +59,12 @@ detect(){
   elif [ -e /etc/alpine-release ] || [ -n "${ISH_TMPDIR:-}" ] || \
        grep -qi alpine /etc/os-release 2>/dev/null; then
     MUSL=1
+  fi
+  # Minis profile: /var/minis exists AND the in-app browser CLI is present.
+  # This is what unlocks the ableSci WebView driver (see SKILL.md).
+  MINIS=0
+  if [ -d /var/minis ] && command -v minis-browser-use >/dev/null 2>&1; then
+    MINIS=1
   fi
   need_py
 }
@@ -122,6 +133,14 @@ EOF
 # ----- main ---------------------------------------------------------------
 detect
 
+if [ "$MINIS" = "1" ]; then
+  LOG ""
+  LOG "==> Minis profile detected (in-app browser available)"
+  LOG "    ableSci will use the Minis WebView driver (minis-browser-use);"
+  LOG "    Chrome cookies / OpenCLI are NOT required in this environment."
+  LOG ""
+fi
+
 if [ "$MUSL" = "1" ]; then
   install_musl
 else
@@ -136,6 +155,14 @@ if [ -x "$VENV_DIR/bin/paper-fetch" ] || [ -x "$WRAPPER" ] || command -v paper-f
   LOG "==> paper-fetch installed OK."
   LOG "    • code:      $SKILL_DIR"
   LOG "    • venv:      $VENV_DIR"
+  if [ "$MINIS" = "1" ]; then
+    LOG "    • ableSci:   Minis WebView driver (minis-browser-use)"
+    LOG "      For ableSci, log in once inside the Minis in-app browser at"
+    LOG "      https://www.ablesci.com — the session persists across runs."
+  else
+    LOG "    • ableSci:   Chrome cookies (browser-cookie3) + OpenCLI fallback"
+    LOG "      For ableSci, log in once in Google Chrome (see references/ablesci-login.md)."
+  fi
   if [ -x "$WRAPPER" ]; then
     LOG "    • wrapper:   $WRAPPER   (use this on PATH)"
     LOG "    Health-check:  $WRAPPER doctor --json"

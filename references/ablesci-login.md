@@ -4,13 +4,22 @@ ableSci (科研通) is a free document-delivery service. paper-fetch uses it as 
 last fallback source when open access, institutional access, and Sci-Hub all
 fail.
 
-## One-time login in Google Chrome
+## One-time login
 
-1. Open <https://www.ablesci.com> in **Google Chrome** and log in once, and
-   stay logged in.
-2. That is all. paper-fetch reads your ableSci session cookies from Chrome's
-   cookie store; it **never asks for, stores, or writes your ableSci
-   password**.
+Where you log in depends on the environment paper-fetch runs in:
+
+- **Inside Minis (iSH/iOS)** — log in once in the **in-app browser** at
+  <https://www.ablesci.com>; the WebView session persists across runs.
+  paper-fetch then drives the browser through the `minis-browser-use` CLI
+  (`ablesci_driver: auto` picks this path automatically). Chrome cookies and
+  OpenCLI cannot work in the iSH sandbox: `browser-cookie3` needs DBUS and
+  access to the iOS Chrome cookie store, and ableSci's Aliyun WAF
+  (``security_session_verify`` + TLS fingerprinting) redirects plain HTTP
+  clients to `/site/login`.
+- **Desktop (macOS / Linux)** — open <https://www.ablesci.com> in **Google
+  Chrome** and log in once, and stay logged in. paper-fetch reads your
+  ableSci session cookies from Chrome's cookie store; it **never asks for,
+  stores, or writes your ableSci password**.
 
 ## Browser support
 
@@ -21,20 +30,25 @@ fail.
   path described below.
 - `paper-fetch doctor` never makes a login request to ableSci on your
   behalf. It only checks whether a usable session already exists in the
-  local cookie store.
+  local cookie store (or reports that the Minis WebView driver is available).
 
 ## How the session is used
 
-- The CLI reads cookies for the `ablesci.com` domain with `browser-cookie3`
-  and calls ableSci's HTTP API directly — no browser window is opened.
+- Desktop: the CLI reads cookies for the `ablesci.com` domain with
+  `browser-cookie3` and calls ableSci's HTTP API directly — no browser
+  window is opened.
+- Inside Minis: the CLI drives the in-app WebView: it checks the login,
+  submits the request form, polls for the download link, opens the download
+  page (whose JS decrypts the encrypted served file), waits for the native
+  download to land in the workspace, and accepts the file.
 - If Chrome cookies cannot be read (Chrome is running with a locked cookie
   database, or the macOS Keychain is locked), the CLI falls back to the
   OpenCLI Browser Bridge when `opencli` is installed. The fallback opens
   Chrome in background mode without stealing focus.
-- `paper-fetch doctor --json` reports whether a cookie session is available:
-  the `ablesci` check is `ok` only when all required session cookies are
-  present, and `missing` with an action when the session is incomplete or
-  unreadable.
+- `paper-fetch doctor --json` reports whether a session is available:
+  the `ablesci` check is `ok` only when the active path is ready (session
+  cookies present on desktop; the WebView driver available inside Minis),
+  and `missing` with an action when the session is incomplete or unreadable.
 
 ## Fixing a failed cookie read
 

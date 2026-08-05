@@ -1,7 +1,7 @@
 ---
 name: paper-fetch
 description: Use when user wants to download a paper PDF to Zotero.
-version: 0.4.0
+version: 0.5.0
 license: AGPL-3.0-only
 ---
 
@@ -18,11 +18,17 @@ environment and sidesteps the known pitfalls, especially on iSH/Alpine):
 sh scripts/minis-install.sh     # from a clone of this repo / the skill dir
 ```
 
-What the installer does per environment:
+What the installer does per environment (two profiles, auto-detected):
 
+- **Minis / iSH / iOS** — Minis profile. ableSci uses the **in-app WebView
+  driver** (`minis-browser-use`) instead of Chrome cookies / OpenCLI, which
+  cannot work in the iSH sandbox (no DBUS, no access to the iOS Chrome cookie
+  store, and ableSci's Aliyun WAF blocks plain HTTP clients). Installer prints
+  the Minis-specific setup notes and instructions for the one-time ableSci
+  login inside the in-app browser.
 - **macOS / glibc Linux with `uv`** → official `uv tool install` (one line, cached wheels)
 - **macOS / glibc Linux without `uv`** → venv + pip (wheels exist)
-- **iSH / Alpine / any musl+aarch64** → `apk add py3-lz4 py3-lz4-pyc`, then a
+- **iSH / Alpine / any musl+aarch64 (non-Minis)** → `apk add py3-lz4 py3-lz4-pyc`, then a
   `--system-site-packages` venv + pip for the rest. A plain `uv tool install`
   **fails** here: `lz4` and `pycryptodomex` (both pulled in by
   `browser-cookie3`) ship C extensions with no `musllinux_aarch64` wheel and
@@ -77,8 +83,9 @@ never prints credentials. Act on the report:
   `references/scihub-clash-setup.md`.
 - Before writing to `~/.paper-fetch/config.json`, state exactly which fields
   you will add or change and get the user's explicit consent first.
-- Never ask the user for an ableSci password — the tool reads the Chrome
-  session; never echo cookie values or API keys into the chat.
+- Never ask the user for an ableSci password — the tool reads the existing
+  browser session (Chrome cookies on desktop, the Minis in-app browser inside
+  Minis); never echo cookie values or API keys into the chat.
 
 ## Acquisition policy
 
@@ -107,7 +114,7 @@ The preferred policy is to stop at the first valid PDF, while preserving this ga
 1. **Open Access** — PMC → Europe PMC → PubMed linkout → Unpaywall
 2. **Institution** — EasyConnect/aTrust SOCKS5 or HTTP proxy; this route must be attempted before any fallback service when configured
 3. **Sci-Hub** — Clash HTTP proxy
-4. **ableSci/科研通** — HTTP API via Chrome cookies (primary), OpenCLI Browser Bridge (fallback), with polling wait described below
+4. **ableSci/科研通** — Minis WebView driver (inside Minis), HTTP API via Chrome cookies (desktop primary), OpenCLI Browser Bridge (fallback), with polling wait described below
 
 A detailed attempt list is always included in the JSON output. If the institution route is configured but cannot be reached, record `proxy_unavailable`/TLS `network_error` and then continue to the next source; do not silently skip the attempt.
 
@@ -135,12 +142,26 @@ After the user confirms they have completed the manual step, re-run the same `pa
 
 ## Browser behavior
 
-The CLI uses a **two-tier approach** for ableSci/科研通 downloads:
+The CLI uses a **three-tier approach** for ableSci/科研通 downloads. The
+driver is chosen automatically (`ablesci_driver: auto`) — explicit override
+values: `http`, `browser`, `opencli`.
 
-1. **HTTP API (primary)** — reads Chrome cookies via `browser-cookie3` and calls ableSci's API directly. No browser window is opened. This is the default path and requires you to be logged in to ableSci in Chrome at least once.
-2. **OpenCLI Browser Bridge (fallback)** — only used when Chrome cookies are unavailable. Opens Chrome in background mode (`--window background`) without stealing focus.
+1. **Minis WebView driver (primary inside Minis)** — drives the persistent
+   in-app browser through the `minis-browser-use` CLI: checks the login,
+   submits the request form, polls for the download link, opens the download
+   page (its JS decrypts the file — served PDFs are encrypted and must be
+   downloaded through the site), waits for the native download to land in the
+   workspace, and accepts the file. This works on iSH/iOS where Chrome-cookie
+   reading (DBUS + iOS Chrome store) and OpenCLI both fail.
+2. **HTTP API** — reads Chrome cookies via `browser-cookie3` and calls
+   ableSci's API directly. No browser window is opened. This is the default
+   path on desktop and requires you to be logged in to ableSci in Chrome at
+   least once.
+3. **OpenCLI Browser Bridge (fallback)** — only used when the above are
+   unavailable. Opens Chrome in background mode (`--window background`)
+   without stealing focus.
 
-For both ableSci paths, request creation and file availability are separate events. After submitting a new request, poll the request detail/recent-request state every ~5 seconds for up to **60 seconds**. Use a fresh page/state read on every poll (do not retain stale browser element refs or a stale detail page). Stop early when a valid download link appears; otherwise return `pending`/`poll_timeout` with the request ID for later retry. A newly created request with no download link is not a failed acquisition.
+For all ableSci paths, request creation and file availability are separate events. After submitting a new request, poll the request detail/recent-request state every ~5 seconds for up to **60 seconds**. Use a fresh page/state read on every poll (do not retain stale browser element refs or a stale detail page). Stop early when a valid download link appears; otherwise return `pending`/`poll_timeout` with the request ID for later retry. A newly created request with no download link is not a failed acquisition.
 
 For Sci-Hub, the CLI detects the ALTCHA challenge page and solves the
 proof-of-work automatically (brute-force SHA-256 over the nonce range, then
@@ -176,11 +197,15 @@ Create `~/.paper-fetch/config.json` (permissions `0600` recommended):
   "zotero_library_type": "user",
   "zotero_inbox_collection_key": "YOUR_00_INBOX_COLLECTION_KEY",
   "zotero_api_key": "YOUR_ZOTERO_API_KEY",
-  "ablesci_url": "https://www.ablesci.com"
+  "ablesci_url": "https://www.ablesci.com",
+  "ablesci_driver": "auto"
 }
 ```
 
-All fields are optional. Environment variables (`PAPER_FETCH_*`) override JSON values.
+All fields are optional. `ablesci_driver` selects the ableSci transport:
+`auto` (default — Minis WebView driver inside Minis, HTTP cookies elsewhere),
+`http` (Chrome cookies), `browser` (Minis WebView driver only), or `opencli`.
+Environment variables (`PAPER_FETCH_*`) override JSON values.
 Fill credentials yourself; never commit personal config into the repository.
 
 ## References

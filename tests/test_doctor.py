@@ -183,6 +183,7 @@ def test_ablesci_output_has_no_cookie_metadata(monkeypatch, capsys, tmp_path):
 def test_ablesci_no_cookie_no_opencli(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("paper_fetch.doctor._read_ablesci_cookies", lambda: None)
     monkeypatch.setattr("paper_fetch.doctor._opencli_available", lambda: False)
+    monkeypatch.setattr("paper_fetch.doctor._minis_browser_available", lambda: False)
     cfg = _write_config(tmp_path, {"ablesci_url": "https://www.ablesci.com"})
     code = main(["doctor", "--json", "--config", str(cfg)])
     out = json.loads(capsys.readouterr().out)
@@ -195,12 +196,27 @@ def test_ablesci_no_cookie_no_opencli(monkeypatch, capsys, tmp_path):
 def test_ablesci_no_cookie_opencli_fallback(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("paper_fetch.doctor._read_ablesci_cookies", lambda: None)
     monkeypatch.setattr("paper_fetch.doctor._opencli_available", lambda: True)
+    monkeypatch.setattr("paper_fetch.doctor._minis_browser_available", lambda: False)
     cfg = _write_config(tmp_path, {"ablesci_url": "https://www.ablesci.com"})
     code = main(["doctor", "--json", "--config", str(cfg)])
     out = json.loads(capsys.readouterr().out)
     ablesci = _names(out)["ablesci"]
     assert ablesci["status"] == "missing"
     assert "fallback" in ablesci["action"].lower()
+
+
+def test_ablesci_minis_browser_driver(monkeypatch, capsys, tmp_path):
+    """Inside Minis, doctor reports the WebView driver path (cookies/OpenCLI
+    cannot work there), regardless of the cookie store state."""
+    monkeypatch.setattr("paper_fetch.doctor._read_ablesci_cookies", lambda: None)
+    monkeypatch.setattr("paper_fetch.doctor._opencli_available", lambda: False)
+    monkeypatch.setattr("paper_fetch.doctor._minis_browser_available", lambda: True)
+    cfg = _write_config(tmp_path, {"ablesci_url": "https://www.ablesci.com"})
+    code = main(["doctor", "--json", "--config", str(cfg)])
+    out = json.loads(capsys.readouterr().out)
+    ablesci = _names(out)["ablesci"]
+    assert ablesci["status"] == "missing"
+    assert "minis browser" in ablesci["action"].lower()
 
 
 class _FakeCookie:

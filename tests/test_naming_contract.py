@@ -116,13 +116,13 @@ class TestVersionsAligned:
     def test_package_version_is_040(self):
         from paper_fetch import __version__
 
-        assert __version__ == "0.4.0"
+        assert __version__ == "0.5.0"
 
     def test_pyproject_version_is_040(self):
         text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        assert re.search(r'^version\s*=\s*"0\.4\.0"\s*$', text, re.M)
+        assert re.search(r'^version\s*=\s*"0\.5\.0"\s*$', text, re.M)
 
     def test_skill_version_is_040(self):
         text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-        assert re.search(r"^version:\s*0\.4\.0\s*$", text, re.M)
+        assert re.search(r"^version:\s*0\.5\.0\s*$", text, re.M)
         assert re.search(r"^name:\s*paper-fetch\s*$", text, re.M)

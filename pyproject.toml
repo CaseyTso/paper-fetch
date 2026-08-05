@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "paper-fetch"
-version = "0.4.0"
+version = "0.5.0"
 description = "Minimal single-paper PDF acquisition and Zotero attachment"
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"

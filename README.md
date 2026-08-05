@@ -274,15 +274,23 @@ Setup guide: [`references/scihub-clash-setup.md`](references/scihub-clash-setup.
 
 ### ableSci / 科研通
 
-1. Open <https://www.ablesci.com> in Chrome and **log in once**. paper-fetch
-   reads the session from Chrome's cookies; it never stores or asks for your
-   ableSci password.
+1. Log in to <https://www.ablesci.com> **once** in the environment's browser:
+   - **Inside Minis** → log in in the in-app browser (session persists across
+     runs). paper-fetch then drives it via `minis-browser-use`; it never
+     stores or asks for your ableSci password.
+   - **On desktop** → log in in Google Chrome; paper-fetch reads the session
+     from Chrome's cookies.
 2. Configure `"ablesci_url": "https://www.ablesci.com"`.
-3. If cookies cannot be read (Chrome cookie DB locked, Keychain locked), the
-   CLI falls back to the OpenCLI Browser Bridge when `opencli` is installed.
+3. Transport selection (`ablesci_driver`, default `auto`):
+   - Inside Minis → Minis WebView driver (primary); Chrome cookies / OpenCLI
+     cannot work in the iSH sandbox (no DBUS, no iOS Chrome store, Aliyun WAF
+     blocks plain HTTP clients).
+   - On desktop → Chrome-cookie HTTP API (primary), OpenCLI Browser Bridge
+     fallback when `opencli` is installed.
    `paper-fetch doctor --json` reports which path is available.
-4. If a fetch returns `authentication_required`, log in to ableSci in Chrome
-   again and rerun the same command.
+4. If a fetch returns `authentication_required`, log in to ableSci again in
+   the environment's browser (in-app browser inside Minis, Chrome on desktop)
+   and rerun the same command.
 
 User guide: [`references/ablesci-login.md`](references/ablesci-login.md).
 
@@ -334,7 +342,7 @@ The pipeline stops at the first valid multi-page PDF:
 1. **Open access** — PMC → Europe PMC → PubMed full-text links → Unpaywall
 2. **Institution access** — EasyConnect/aTrust SOCKS5 or HTTP proxy
 3. **Sci-Hub** — Clash HTTP proxy
-4. **ableSci/科研通** — Chrome-cookie HTTP API, then OpenCLI Browser Bridge fallback
+4. **ableSci/科研通** — Minis WebView driver (inside Minis), Chrome-cookie HTTP API (desktop primary), OpenCLI Browser Bridge fallback
 
 The ableSci request may be asynchronous. `pending` or `poll_timeout` means the request is still processing, not that the paper is missing. `authentication_required` needs the user to log in to ableSci and rerun. Sci-Hub ALTCHA challenges are solved automatically, so `challenge_required` only appears when automatic solving failed.
 

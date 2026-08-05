@@ -116,6 +116,14 @@ def _opencli_available() -> bool:
     return shutil.which("opencli") is not None
 
 
+def _minis_browser_available() -> bool:
+    """True inside Minis when the in-app WebView CLI is on PATH."""
+    return (
+        Path("/var/minis").is_dir()
+        and shutil.which("minis-browser-use") is not None
+    )
+
+
 def _check_config_file(path: Path) -> tuple[dict[str, str], Config | None]:
     """Check the config file. Returns (check entry, loaded Config or None)."""
     if not path.exists():
@@ -251,6 +259,22 @@ def _check_ablesci(cfg: Config) -> dict[str, str]:
             "use a full http(s) URL, e.g. https://www.ablesci.com",
         )
     cookie_names = _read_ablesci_cookies()
+    # Minis environment: the WebView driver is the primary path — cookie
+    # reading cannot work there (iOS Chrome store + DBUS are unavailable).
+    if _minis_browser_available():
+        if cookie_names is None or not set(_ABLESCI_ESSENTIAL_COOKIES).issubset(cookie_names):
+            return _check(
+                "ablesci",
+                MISSING,
+                "Minis browser driver available — log in to ableSci once inside the in-app browser (session persists across runs)",
+                "open https://www.ablesci.com in the Minis browser, log in and keep the session, then rerun doctor (see references/ablesci-login.md)",
+            )
+        return _check(
+            "ablesci",
+            OK,
+            "ableSci session ready (Minis browser driver; session cookies present)",
+            "",
+        )
     if cookie_names is None:
         if _opencli_available():
             return _check(

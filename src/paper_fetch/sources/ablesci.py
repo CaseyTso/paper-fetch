@@ -18,6 +18,7 @@ import requests
 from ..config import Config
 from ..models import PaperIdentity, SourceResult, Status
 from ..pdf import download_candidate
+from .ablesci_browser import is_minis_env
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +56,7 @@ class OpenCLIError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# ableSci source — HTTP + cookie path (primary), OpenCLI fallback
+# ableSci source — HTTP + cookie path (primary), Minis browser, OpenCLI fallback
 # ---------------------------------------------------------------------------
 
 _CREATE_URL = "/assist/create"
@@ -75,7 +76,7 @@ class AbleSciSource:
             self._base_url = self._base_url.replace("://ablesci.com", "://www.ablesci.com")
 
     # ------------------------------------------------------------------
-    # Public entry point — HTTP first, OpenCLI fallback
+    # Public entry point — driver order depends on the environment
     # ------------------------------------------------------------------
 
     def fetch(self, identity: PaperIdentity, destination: Path) -> SourceResult:
@@ -86,13 +87,49 @@ class AbleSciSource:
         if not doi and not title:
             return self._failure(Status.NOT_FOUND, "no DOI or title")
 
-        # Try HTTP+cookie path first
-        result = self._fetch_http(identity, destination)
-        if result is not None:
-            return result
+        driver = (self._config.ablesci_driver or "auto").strip().lower()
+        for path in self._driver_order(driver):
+            if path == "browser":
+                # Minis WebView path — only exists inside Minis
+                if not is_minis_env():
+                    continue
+                from .ablesci_browser import AbleSciBrowserSource, MinisBrowserError
+                try:
+                    return AbleSciBrowserSource(self._base_url, self._timeout).fetch(
+                        identity, destination
+                    )
+                except MinisBrowserError as exc:
+                    return self._failure(exc.status, exc.detail)
 
-        # Fallback to legacy OpenCLI path
-        return self._fetch_opencli(doi, title, destination)
+            if path == "http":
+                # HTTP + Chrome-cookie path
+                result = self._fetch_http(identity, destination)
+                if result is not None:
+                    return result
+
+            if path == "opencli":
+                # Legacy OpenCLI path
+                return self._fetch_opencli(doi, title, destination)
+
+        return self._failure(
+            Status.CONFIGURATION_ERROR,
+            f"no ableSci driver usable for driver='{driver}'",
+        )
+
+    @staticmethod
+    def _driver_order(driver: str) -> list[str]:
+        """Resolve the driver cascade for a given configured value.
+
+        * explicit ``http`` / ``browser`` / ``opencli`` → only that driver
+        * ``auto`` (default) → Minis: browser first (cookies/OpenCLI cannot
+          work there), otherwise HTTP first (the classic desktop path).
+        """
+        if driver in ("http", "browser", "opencli"):
+            return [driver]
+        if is_minis_env():
+            return ["browser", "http", "opencli"]
+        return ["http", "opencli"]
+
 
     # ------------------------------------------------------------------
     # HTTP path — uses browser_cookie3 + requests
