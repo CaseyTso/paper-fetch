@@ -22,6 +22,21 @@
 
 ## 安装 CLI
 
+内置的跨平台安装器会自动检测环境并选择两套安装路径之一：
+
+```bash
+sh scripts/minis-install.sh    # 在仓库克隆 / skill 目录中运行
+```
+
+- **Minis（iSH/iOS）**：检测到 `/var/minis` 且 PATH 中有 `minis-browser-use`
+  时启用。通过 Alpine 系统包 + `--system-site-packages` venv 安装，并输出
+  Minis 专属的 ableSci 配置提示（见
+  [Minis（iOS / iSH）适配](#minisios--ish适配)）。
+- **macOS / glibc Linux**：`uv tool install`（无 `uv` 时用 venv + pip），
+  ableSci 走经典 Chrome cookies 路径。
+
+手动安装的等价方式：
+
 ### 从 GitHub 安装用户级 CLI
 
 ```bash
@@ -46,6 +61,57 @@ uv run paper-fetch --help
 uv tool install --editable --force .
 paper-fetch --help
 ```
+
+## Minis（iOS / iSH）适配
+
+paper-fetch 将 **Minis**（iSH/iOS 终端）视为一等公民环境。安装器和 CLI
+会自动检测（`/var/minis` 存在且 PATH 中有 `minis-browser-use`）并适配：
+
+### Minis 环境的行为差异
+
+| 方面 | 桌面（macOS/Linux） | Minis（iSH/iOS） |
+|---|---|---|
+| 安装 | `uv tool install` | `sh scripts/minis-install.sh` → Alpine 系统包 + venv |
+| ableSci 传输 | Chrome cookies（`browser-cookie3`）→ OpenCLI 回退 | **Minis WebView 驱动**（`minis-browser-use`） |
+| ableSci 登录 | 在 Google Chrome 登录一次 | 在内置浏览器登录一次（会话持久） |
+| 开放获取 / Unpaywall | 正常 | 正常 |
+| Sci-Hub | 经 Clash 代理 | 经 Clash 代理（设备上需运行 Clash） |
+| 机构代理 | EasyConnect/aTrust SOCKS5 | 相同（若设备上运行了 VPN 客户端） |
+| Zotero | 完整上传 | 配置好 Zotero Web API 凭据即可上传 |
+
+### 为什么 ableSci 需要浏览器驱动？
+
+在 iSH 中，桌面的 ableSci 路径全都无法工作：
+
+- `browser-cookie3` 需要 DBUS/Secret Service 以及访问 iOS Chrome 的 cookie
+  库——iSH 沙盒里两者都不存在。
+- OpenCLI 驱动桌面 Chrome——iOS 上没有 Chrome。
+- 纯 HTTP 客户端会被 ableSci 的阿里云 WAF（`security_session_verify` +
+  TLS 指纹校验）拦截并重定向到 `/site/login`，即使 cookies 有效也不行；
+  且网站提供的 PDF 是加密的，必须由网站自己的 JavaScript 解密。
+
+因此 paper-fetch 通过 `minis-browser-use` CLI 驱动**内置 WebView**：先检查
+登录态（通过受保护页面判断，因为移动端 header 折叠了退出/用户名文本），
+提交求助表单，轮询下载链接，打开下载页，等待原生下载落到 workspace，并
+采纳文件。若同一 DOI 已有可下载的既有求助，会直接复用，避免重复花费积分。
+
+### 配置
+
+`ablesci_driver`（默认 `auto`）选择传输方式：`auto` 在 Minis 内优先
+WebView 驱动，在桌面上优先 Chrome-cookie HTTP API；`http`、`browser`、
+`opencli` 可强制指定某一路径。
+
+```bash
+paper-fetch doctor --json    # 报告当前可用的 ableSci 路径
+```
+
+### Minis 环境已知限制
+
+- ableSci 下载经浏览器原生下载落盘；文件要等下载页 JS 解密完成后才会出现
+  在 `/var/minis/workspace/`（文件名带 `科研通-ablesci.com` 后缀）。
+- WebView 驱动是顺序执行的，一次 ableSci 求助约需 1–2 分钟
+  （提交 → 轮询 → 下载 → 采纳）。
+- Sci-Hub 仍需设备上可达的 Clash 代理（配置项 `clash_proxy`）。
 
 ## 安装到 Hermes
 
@@ -251,10 +317,19 @@ paper-fetch doctor --json
 
 ### 科研通 ableSci
 
-1. 在 Chrome 中打开 <https://www.ablesci.com> 并**登录一次**。paper-fetch 从 Chrome cookies 读取会话，**不会保存或索要你的科研通密码**。
+1. 在对应环境的浏览器中打开 <https://www.ablesci.com> 并**登录一次**：
+   - **Minis 环境** → 在内置浏览器中登录（会话跨运行持久）。paper-fetch
+     通过 `minis-browser-use` 驱动它，**不会保存或索要你的科研通密码**。
+   - **桌面环境** → 在 Google Chrome 中登录；paper-fetch 从 Chrome cookies
+     读取会话。
 2. 配置 `"ablesci_url": "https://www.ablesci.com"`。
-3. 若无法读取 cookies（Chrome cookie 库被锁、钥匙串被锁），当安装了 `opencli` 时 CLI 会回退到 OpenCLI Browser Bridge。`paper-fetch doctor --json` 会报告当前可用路径。
-4. 若 fetch 返回 `authentication_required`，在 Chrome 中重新登录科研通，再运行同一条命令。
+3. 传输方式（`ablesci_driver`，默认 `auto`）：
+   - Minis 环境 → Minis WebView 驱动（首选）；Chrome cookies / OpenCLI 在
+     iSH 沙盒中不可用（无 DBUS、无 iOS Chrome 库、阿里云 WAF 拦截纯 HTTP）。
+   - 桌面环境 → Chrome-cookie HTTP API（首选），安装了 `opencli` 时回退到
+     OpenCLI Browser Bridge。`paper-fetch doctor --json` 会报告当前可用路径。
+4. 若 fetch 返回 `authentication_required`，在对应环境的浏览器中重新登录
+   科研通（Minis 用内置浏览器，桌面用 Chrome），再运行同一条命令。
 
 用户指南：[`references/ablesci-login.md`](references/ablesci-login.md)。
 
@@ -304,7 +379,7 @@ paper-fetch fetch \
 1. **开放获取**：PMC → Europe PMC → PubMed 全文链接 → Unpaywall
 2. **机构访问**：EasyConnect/aTrust SOCKS5 或 HTTP 代理
 3. **Sci-Hub**：Clash HTTP 代理
-4. **科研通 ableSci**：Chrome cookies HTTP API，必要时回退到 OpenCLI Browser Bridge
+4. **科研通 ableSci**：Minis WebView 驱动（Minis 环境）、Chrome cookies HTTP API（桌面首选）、OpenCLI Browser Bridge 回退
 
 科研通请求可能是异步的。`pending` 或 `poll_timeout` 表示请求仍在处理，不代表论文不存在。`authentication_required` 需要用户登录科研通后重跑；Sci-Hub 的 ALTCHA 挑战会自动求解，`challenge_required` 仅在自动求解失败时出现。
 

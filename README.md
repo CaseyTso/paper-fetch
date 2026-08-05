@@ -22,6 +22,22 @@ This is not a keyword-search engine or a batch literature-discovery tool. For mu
 
 ## Install the CLI
 
+Two install profiles are auto-detected by the bundled cross-platform
+installer:
+
+```bash
+sh scripts/minis-install.sh    # from a clone of this repo / the skill dir
+```
+
+- **Minis (iSH/iOS)** — detected by `/var/minis` + `minis-browser-use` on
+  PATH. Installs via Alpine packages + a `--system-site-packages` venv and
+  prints Minis-specific ableSci setup notes (see
+  [Minis (iOS / iSH) support](#minis-ios--ish-support)).
+- **macOS / glibc Linux** — `uv tool install` (or venv + pip when `uv` is
+  absent), with the classic Chrome-cookie ableSci path.
+
+Manual equivalents:
+
 ### User-level installation from GitHub
 
 ```bash
@@ -46,6 +62,63 @@ Use this when developing the Skill and CLI. Changes under `src/` are used immedi
 uv tool install --editable --force .
 paper-fetch --help
 ```
+
+## Minis (iOS / iSH) support
+
+paper-fetch runs inside **Minis** (the iSH/iOS shell) as a first-class
+environment. The installer and the CLI detect it automatically
+(`/var/minis` exists and `minis-browser-use` is on PATH) and adapt:
+
+### What changes inside Minis
+
+| Area | Desktop (macOS/Linux) | Minis (iSH/iOS) |
+|---|---|---|
+| Install | `uv tool install` | `sh scripts/minis-install.sh` → Alpine packages + venv |
+| ableSci transport | Chrome cookies (`browser-cookie3`) → OpenCLI fallback | **Minis WebView driver** (`minis-browser-use`) |
+| ableSci login | Once in Google Chrome | Once in the in-app browser (session persists) |
+| Open access / Unpaywall | normal | normal |
+| Sci-Hub | via Clash proxy | via Clash proxy (requires Clash on the device) |
+| Institution proxy | EasyConnect/aTrust SOCKS5 | same (if the VPN client runs on the device) |
+| Zotero | full upload | upload works if Zotero Web API credentials are configured |
+
+### Why a browser driver for ableSci?
+
+Inside iSH none of the desktop ableSci paths can work:
+
+- `browser-cookie3` needs DBUS/Secret Service and access to the iOS Chrome
+  cookie store — neither exists in the iSH sandbox.
+- OpenCLI drives a desktop Chrome — there is none on iOS.
+- Plain HTTP clients are blocked by ableSci's Aliyun WAF
+  (`security_session_verify` + TLS fingerprint checks) and redirected to
+  `/site/login` even with valid cookies; served PDFs are encrypted and must
+  be decrypted by the site's own JavaScript.
+
+So paper-fetch drives the **in-app WebView** through the `minis-browser-use`
+CLI: it checks the login (via a protected page, since the mobile header
+collapses the logout text), submits the request form, polls for the download
+link, opens the download page, waits for the native download to land in the
+workspace, and accepts the file. Existing requests that already have a
+downloadable file for the same DOI are reused, so no points are spent twice.
+
+### Config
+
+`ablesci_driver` (default `auto`) selects the transport: `auto` picks the
+WebView driver inside Minis and the Chrome-cookie HTTP API on desktop;
+`http`, `browser` and `opencli` force a specific path.
+
+```bash
+paper-fetch doctor --json    # reports which ableSci path is available
+```
+
+### Known limits inside Minis
+
+- ableSci downloads land via the browser's native download; the file appears
+  in `/var/minis/workspace/` (with a `科研通-ablesci.com` suffix) only after
+  the download page's JS finishes decrypting it.
+- The WebView driver is sequential and can take ~1–2 minutes per ableSci
+  request (submit → poll → download → accept).
+- Sci-Hub still needs a Clash proxy reachable from the device
+  (`clash_proxy` in the config).
 
 ## Install into Hermes
 
